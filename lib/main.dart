@@ -12,11 +12,13 @@ import 'data/repositories/auth_repository.dart';
 import 'data/repositories/meal_repository.dart';
 import 'data/repositories/order_repository.dart';
 import 'data/repositories/review_repository.dart';
+import 'data/repositories/notification_repository.dart';
 import 'data/services/local/shared_prefs_service.dart';
 import 'providers/auth/auth_provider.dart';
 import 'providers/meal/meal_provider.dart';
 import 'providers/order/order_provider.dart';
 import 'providers/review/review_provider.dart';
+import 'providers/notification/notification_provider.dart';
 import 'ui/screens/splash/splash_screen.dart';
 import 'ui/screens/auth/login_screen.dart';
 import 'ui/screens/customer/customer_home_screen.dart';
@@ -122,6 +124,9 @@ class FoodSaverApp extends StatelessWidget {
         Provider<ReviewRepository>(
           create: (_) => ReviewRepository(),
         ),
+        Provider<NotificationRepository>(
+          create: (_) => NotificationRepository(),
+        ),
 
         // Providers
         ChangeNotifierProvider<AuthProvider>(
@@ -143,6 +148,11 @@ class FoodSaverApp extends StatelessWidget {
         ChangeNotifierProvider<ReviewProvider>(
           create: (context) => ReviewProvider(
             context.read<ReviewRepository>(),
+          ),
+        ),
+        ChangeNotifierProvider<NotificationProvider>(
+          create: (context) => NotificationProvider(
+            context.read<NotificationRepository>(),
           ),
         ),
       ],
