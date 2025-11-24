@@ -60,7 +60,6 @@ class RazorpayService {
       'amount': amountInPaise,
       'name': 'FoodSaver',
       'description': description,
-      'order_id': orderId, // Your order ID
       'prefill': {
         'contact': phone,
         'email': email,
@@ -69,16 +68,6 @@ class RazorpayService {
       'theme': {
         'color': '#FF6B6B', // Your app's primary color
       },
-      'modal': {
-        'ondismiss': () {
-          debugPrint('Payment dismissed');
-        }
-      },
-      // Test mode settings
-      'notes': {
-        'mode': 'test',
-        'order_id': orderId,
-      }
     };
 
     try {
