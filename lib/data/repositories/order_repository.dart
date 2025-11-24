@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/order/order_model.dart';
 
 class OrderRepository {
@@ -6,6 +7,27 @@ class OrderRepository {
 
   OrderRepository({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
+
+  // Helper to log Firestore index errors
+  void _logFirestoreError(dynamic error, String operation) {
+    final errorStr = error.toString();
+    if (errorStr.contains('index') || errorStr.contains('FAILED_PRECONDITION')) {
+      debugPrint('\n${'='*80}');
+      debugPrint('🔥 FIRESTORE INDEX REQUIRED 🔥');
+      debugPrint('Operation: $operation');
+      debugPrint('='*80);
+      debugPrint(errorStr);
+      debugPrint('='*80);
+      // Extract and print the index creation URL if available
+      final urlMatch = RegExp(r'https://console\.firebase\.google\.com[^\s]+').firstMatch(errorStr);
+      if (urlMatch != null) {
+        debugPrint('\n📋 CREATE INDEX HERE:');
+        debugPrint(urlMatch.group(0));
+        debugPrint('');
+      }
+      debugPrint('${'='*80}\n');
+    }
+  }
 
   // Create order
   Future<String> createOrder(OrderModel order) async {
@@ -21,6 +43,7 @@ class OrderRepository {
 
       return docRef.id;
     } catch (e) {
+      _logFirestoreError(e, 'createOrder');
       throw Exception('Failed to create order: $e');
     }
   }
@@ -45,6 +68,9 @@ class OrderRepository {
         .where('userId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
+        .handleError((error) {
+          _logFirestoreError(error, 'getUserOrders');
+        })
         .map((snapshot) => snapshot.docs
             .map((doc) => OrderModel.fromFirestore(doc))
             .toList());
@@ -57,6 +83,9 @@ class OrderRepository {
         .where('restaurantId', isEqualTo: restaurantId)
         .orderBy('createdAt', descending: true)
         .snapshots()
+        .handleError((error) {
+          _logFirestoreError(error, 'getRestaurantOrders');
+        })
         .map((snapshot) => snapshot.docs
             .map((doc) => OrderModel.fromFirestore(doc))
             .toList());
@@ -70,6 +99,9 @@ class OrderRepository {
         .where('status', whereIn: ['pending', 'confirmed', 'ready'])
         .orderBy('createdAt', descending: false) // Oldest first for active orders
         .snapshots()
+        .handleError((error) {
+          _logFirestoreError(error, 'getActiveRestaurantOrders');
+        })
         .map((snapshot) => snapshot.docs
             .map((doc) => OrderModel.fromFirestore(doc))
             .toList());
@@ -82,6 +114,9 @@ class OrderRepository {
         .orderBy('createdAt', descending: true)
         .limit(100) // Limit for performance
         .snapshots()
+        .handleError((error) {
+          _logFirestoreError(error, 'getAllOrders');
+        })
         .map((snapshot) => snapshot.docs
             .map((doc) => OrderModel.fromFirestore(doc))
             .toList());

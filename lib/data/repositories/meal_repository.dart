@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/meal/meal_model.dart';
 
 class MealRepository {
@@ -6,6 +7,27 @@ class MealRepository {
 
   MealRepository({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
+
+  // Helper to log Firestore index errors
+  void _logFirestoreError(dynamic error, String operation) {
+    final errorStr = error.toString();
+    if (errorStr.contains('index') || errorStr.contains('FAILED_PRECONDITION')) {
+      debugPrint('\n${'='*80}');
+      debugPrint('🔥 FIRESTORE INDEX REQUIRED 🔥');
+      debugPrint('Operation: $operation');
+      debugPrint('='*80);
+      debugPrint(errorStr);
+      debugPrint('='*80);
+      // Extract and print the index creation URL if available
+      final urlMatch = RegExp(r'https://console\.firebase\.google\.com[^\s]+').firstMatch(errorStr);
+      if (urlMatch != null) {
+        debugPrint('\n📋 CREATE INDEX HERE:');
+        debugPrint(urlMatch.group(0));
+        debugPrint('');
+      }
+      debugPrint('${'='*80}\n');
+    }
+  }
 
   // Create meal
   Future<String> createMeal(MealModel meal) async {
@@ -37,6 +59,9 @@ class MealRepository {
         .where('restaurantId', isEqualTo: restaurantId)
         .orderBy('createdAt', descending: true)
         .snapshots()
+        .handleError((error) {
+          _logFirestoreError(error, 'getRestaurantMeals');
+        })
         .map((snapshot) =>
             snapshot.docs.map((doc) => MealModel.fromFirestore(doc)).toList());
   }
@@ -49,6 +74,9 @@ class MealRepository {
         .where('availableQuantity', isGreaterThan: 0)
         .orderBy('createdAt', descending: true)
         .snapshots()
+        .handleError((error) {
+          _logFirestoreError(error, 'getAvailableMeals');
+        })
         .map((snapshot) =>
             snapshot.docs.map((doc) => MealModel.fromFirestore(doc)).toList());
   }
@@ -62,6 +90,9 @@ class MealRepository {
         .where('availableQuantity', isGreaterThan: 0)
         .orderBy('createdAt', descending: true)
         .snapshots()
+        .handleError((error) {
+          _logFirestoreError(error, 'getMealsByCategory');
+        })
         .map((snapshot) =>
             snapshot.docs.map((doc) => MealModel.fromFirestore(doc)).toList());
   }
