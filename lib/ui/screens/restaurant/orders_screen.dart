@@ -250,7 +250,28 @@ class _OrderCard extends StatelessWidget {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () async {
-                              await orderProvider.updateOrderStatus(order.id, OrderStatus.confirmed);
+                              try {
+                                debugPrint('🔄 Confirming order: ${order.id}');
+                                await orderProvider.updateOrderStatus(order.id, OrderStatus.confirmed);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Order confirmed successfully!'),
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                debugPrint('❌ Error confirming order: $e');
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to confirm order: ${e.toString()}'),
+                                      backgroundColor: AppColors.error,
+                                    ),
+                                  );
+                                }
+                              }
                             },
                             icon: const Icon(Icons.check),
                             label: const Text('Confirm'),
@@ -263,7 +284,28 @@ class _OrderCard extends StatelessWidget {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () async {
-                              await orderProvider.updateOrderStatus(order.id, OrderStatus.ready);
+                              try {
+                                debugPrint('🔄 Marking order ready: ${order.id}');
+                                await orderProvider.updateOrderStatus(order.id, OrderStatus.ready);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Order marked as ready!'),
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                debugPrint('❌ Error marking order ready: $e');
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to update order: ${e.toString()}'),
+                                      backgroundColor: AppColors.error,
+                                    ),
+                                  );
+                                }
+                              }
                             },
                             icon: const Icon(Icons.done_all),
                             label: const Text('Mark Ready'),
@@ -276,7 +318,28 @@ class _OrderCard extends StatelessWidget {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () async {
-                              await orderProvider.updateOrderStatus(order.id, OrderStatus.completed);
+                              try {
+                                debugPrint('🔄 Completing order: ${order.id}');
+                                await orderProvider.updateOrderStatus(order.id, OrderStatus.completed);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Order completed!'),
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                debugPrint('❌ Error completing order: $e');
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to complete order: ${e.toString()}'),
+                                      backgroundColor: AppColors.error,
+                                    ),
+                                  );
+                                }
+                              }
                             },
                             icon: const Icon(Icons.task_alt),
                             label: const Text('Complete'),
