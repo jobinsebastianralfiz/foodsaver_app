@@ -360,35 +360,32 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
       if (!mounted) return;
 
       debugPrint('✅ Order created successfully!');
+
+      if (!mounted) return;
       setState(() => _isProcessingPayment = false);
 
-      // Close the bottom sheet
+      // Close the bottom sheet first
       debugPrint('🚪 Closing bottom sheet...');
-      Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
 
-      // Wait a bit for the bottom sheet to close
+      // Wait a bit for the bottom sheet animation to complete
       await Future.delayed(const Duration(milliseconds: 300));
 
       if (!mounted) return;
 
-      // Navigate to My Orders screen
+      // Navigate to My Orders screen and show success message there
       debugPrint('🧭 Navigating to MyOrdersScreen...');
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const MyOrdersScreen(),
-        ),
-      );
-
-      // Show success message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Payment successful! Order placed.'),
-            backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 3),
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MyOrdersScreen(),
           ),
-        );
+        ).then((_) {
+          // Don't show snackbar after navigation - the new screen will be visible
+        });
       }
     } catch (e) {
       debugPrint('❌ Error creating order: $e');
