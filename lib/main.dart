@@ -22,7 +22,6 @@ import 'ui/screens/auth/login_screen.dart';
 import 'ui/screens/customer/customer_home_screen.dart';
 import 'ui/screens/restaurant/restaurant_dashboard_screen.dart';
 import 'ui/screens/admin/admin_dashboard_screen.dart';
-import 'utils/seed_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
