@@ -5,7 +5,11 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../providers/auth/auth_provider.dart';
 import '../../../providers/meal/meal_provider.dart';
+import '../../../providers/order/order_provider.dart';
+import '../../../providers/review/review_provider.dart';
 import '../../../data/models/meal/meal_model.dart';
+import '../../../data/models/order/order_model.dart';
+import '../../../data/models/review/review_model.dart';
 import 'browse_meals_screen.dart';
 import 'my_orders_screen.dart';
 import 'notifications_screen.dart';
@@ -337,54 +341,66 @@ class CustomerHomeScreen extends StatelessWidget {
                   // Impact Stats
                   FadeInUp(
                     delay: const Duration(milliseconds: 600),
-                    child: Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.success.withOpacity(0.1),
-                            AppColors.primary.withOpacity(0.1),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
+                    child: StreamBuilder<List<OrderModel>>(
+                      stream: context.read<OrderProvider>().getUserOrders(user!.id),
+                      builder: (context, snapshot) {
+                        final orders = snapshot.data ?? [];
+                        final completedOrders = orders.where((o) => o.status == OrderStatus.completed).toList();
+
+                        final mealsSaved = completedOrders.length;
+                        final foodSaved = completedOrders.fold<double>(0, (sum, order) => sum + (order.quantity * 0.5)); // Estimate 0.5kg per meal
+                        final moneySaved = completedOrders.fold<double>(0, (sum, order) => sum + (order.totalPrice * 0.5)); // Estimate 50% savings
+
+                        return Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.success.withOpacity(0.1),
+                                AppColors.primary.withOpacity(0.1),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
                             children: [
-                              Icon(Icons.eco, color: AppColors.success),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Your Impact',
-                                style: AppTextStyles.subtitle1.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                              Row(
+                                children: [
+                                  Icon(Icons.eco, color: AppColors.success),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Your Impact',
+                                    style: AppTextStyles.subtitle1.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                children: [
+                                  _ImpactStat(
+                                    value: '$mealsSaved',
+                                    label: 'Meals Saved',
+                                    icon: Icons.restaurant,
+                                  ),
+                                  _ImpactStat(
+                                    value: '${foodSaved.toStringAsFixed(1)} kg',
+                                    label: 'Food Saved',
+                                    icon: Icons.scale,
+                                  ),
+                                  _ImpactStat(
+                                    value: '₹${moneySaved.toStringAsFixed(0)}',
+                                    label: 'Money Saved',
+                                    icon: Icons.attach_money,
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          const SizedBox(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              _ImpactStat(
-                                value: '0',
-                                label: 'Meals Saved',
-                                icon: Icons.restaurant,
-                              ),
-                              _ImpactStat(
-                                value: '0 kg',
-                                label: 'Food Saved',
-                                icon: Icons.scale,
-                              ),
-                              _ImpactStat(
-                                value: '\$0',
-                                label: 'Money Saved',
-                                icon: Icons.attach_money,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ),
 
@@ -424,28 +440,34 @@ class CustomerHomeScreen extends StatelessWidget {
                     delay: const Duration(milliseconds: 800),
                     child: SizedBox(
                       height: 180,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          _ReviewCard(
-                            name: 'Sarah M.',
-                            rating: 5,
-                            comment: 'Amazing app! Saved so much money and helped reduce food waste.',
-                            time: '2 days ago',
-                          ),
-                          _ReviewCard(
-                            name: 'John D.',
-                            rating: 4,
-                            comment: 'Great selection of meals. Pickup was super easy!',
-                            time: '5 days ago',
-                          ),
-                          _ReviewCard(
-                            name: 'Emily R.',
-                            rating: 5,
-                            comment: 'Love supporting local restaurants while saving food. Win-win!',
-                            time: '1 week ago',
-                          ),
-                        ],
+                      child: StreamBuilder<List<ReviewModel>>(
+                        stream: context.read<ReviewProvider>().getAllReviews(),
+                        builder: (context, snapshot) {
+                          final reviews = snapshot.data ?? [];
+
+                          if (reviews.isEmpty) {
+                            return Center(
+                              child: Text(
+                                'No reviews yet. Be the first to review!',
+                                style: AppTextStyles.body2,
+                              ),
+                            );
+                          }
+
+                          return ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: reviews.length > 10 ? 10 : reviews.length,
+                            itemBuilder: (context, index) {
+                              final review = reviews[index];
+                              return _ReviewCard(
+                                name: review.userName,
+                                rating: review.rating,
+                                comment: review.comment,
+                                restaurantName: review.restaurantName,
+                              );
+                            },
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -617,13 +639,13 @@ class _ReviewCard extends StatelessWidget {
   final String name;
   final int rating;
   final String comment;
-  final String time;
+  final String? restaurantName;
 
   const _ReviewCard({
     required this.name,
     required this.rating,
     required this.comment,
-    required this.time,
+    this.restaurantName,
   });
 
   @override
@@ -693,13 +715,15 @@ class _ReviewCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            time,
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.textSecondary,
+          if (restaurantName != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              restaurantName!,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

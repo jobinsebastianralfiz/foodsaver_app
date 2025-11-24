@@ -47,6 +47,11 @@ class ReviewProvider extends ChangeNotifier {
     return _reviewRepository.getUserReviews(userId);
   }
 
+  // Get all reviews stream
+  Stream<List<ReviewModel>> getAllReviews({int limit = 10}) {
+    return _reviewRepository.getAllReviews(limit: limit);
+  }
+
   // Check if user has reviewed an order
   Future<bool> hasUserReviewedOrder(String orderId) async {
     try {

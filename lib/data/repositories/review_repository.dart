@@ -76,6 +76,19 @@ class ReviewRepository {
         .map((snapshot) => snapshot.docs.map((doc) => ReviewModel.fromFirestore(doc)).toList());
   }
 
+  // Get all reviews (recent first, limited)
+  Stream<List<ReviewModel>> getAllReviews({int limit = 10}) {
+    return _firestore
+        .collection('reviews')
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .handleError((error) {
+          _logFirestoreError(error, 'getAllReviews');
+        })
+        .map((snapshot) => snapshot.docs.map((doc) => ReviewModel.fromFirestore(doc)).toList());
+  }
+
   // Check if user has already reviewed an order
   Future<bool> hasUserReviewedOrder(String orderId) async {
     try {
