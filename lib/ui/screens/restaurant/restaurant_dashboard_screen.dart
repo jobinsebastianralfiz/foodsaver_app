@@ -4,6 +4,7 @@ import 'package:animate_do/animate_do.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../providers/auth/auth_provider.dart';
+import '../admin/send_notification_screen.dart';
 import 'add_meal_screen.dart';
 import 'orders_screen.dart';
 import 'my_meals_screen.dart';
@@ -28,6 +29,20 @@ class RestaurantDashboardScreen extends StatelessWidget {
             floating: false,
             pinned: true,
             backgroundColor: AppColors.secondary,
+            actions: [
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SendNotificationScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.notifications_active),
+                tooltip: 'Send Notification',
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               title: FadeIn(
                 child: const Text(

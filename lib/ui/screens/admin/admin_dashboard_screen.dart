@@ -10,6 +10,7 @@ import 'user_management_screen.dart';
 import 'restaurant_management_screen.dart';
 import 'admin_analytics_screen.dart';
 import 'meal_moderation_screen.dart';
+import 'send_notification_screen.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
@@ -326,6 +327,26 @@ class AdminDashboardScreen extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (context) => const MealModerationScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  FadeInUp(
+                    delay: const Duration(milliseconds: 800),
+                    child: _AdminActionCard(
+                      icon: Icons.notifications_active,
+                      title: 'Send Notification',
+                      subtitle: 'Send notifications to all customers',
+                      color: AppColors.success,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SendNotificationScreen(),
                           ),
                         );
                       },
