@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../data/models/meal/meal_model.dart';
@@ -8,6 +9,7 @@ import '../../../providers/meal/meal_provider.dart';
 import '../../../providers/auth/auth_provider.dart';
 import '../../../providers/order/order_provider.dart';
 import '../../../data/models/order/order_model.dart';
+import '../../../data/services/payment/razorpay_service.dart';
 
 class BrowseMealsScreen extends StatefulWidget {
   const BrowseMealsScreen({super.key});
@@ -306,10 +308,99 @@ class _MealDetailsSheet extends StatefulWidget {
 
 class _MealDetailsSheetState extends State<_MealDetailsSheet> {
   int _quantity = 1;
+  late RazorpayService _razorpayService;
+  bool _isProcessingPayment = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpayService = RazorpayService();
+    _razorpayService.initialize(
+      onSuccess: _handlePaymentSuccess,
+      onFailure: _handlePaymentFailure,
+    );
+  }
+
+  @override
+  void dispose() {
+    _razorpayService.dispose();
+    super.dispose();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    setState(() => _isProcessingPayment = true);
+
+    final authProvider = context.read<AuthProvider>();
+    final orderProvider = context.read<OrderProvider>();
+
+    final order = OrderModel(
+      id: '',
+      userId: authProvider.user!.id,
+      userName: authProvider.user!.name,
+      userEmail: authProvider.user!.email,
+      userPhone: authProvider.user!.phoneNumber,
+      restaurantId: widget.meal.restaurantId,
+      restaurantName: widget.meal.restaurantName,
+      mealId: widget.meal.id,
+      mealTitle: widget.meal.title,
+      quantity: _quantity,
+      pricePerItem: widget.meal.discountedPrice,
+      totalPrice: widget.meal.discountedPrice * _quantity,
+      pickupTime: widget.meal.pickupStartTime,
+      createdAt: DateTime.now(),
+    );
+
+    try {
+      await orderProvider.createOrder(order);
+      if (!mounted) return;
+
+      setState(() => _isProcessingPayment = false);
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment successful! Order ID: ${response.paymentId?.substring(0, 10)}...'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isProcessingPayment = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment received but order failed: ${e.toString()}'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  void _handlePaymentFailure(PaymentFailureResponse response) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment failed: ${response.message}'),
+        backgroundColor: AppColors.error,
+      ),
+    );
+  }
+
+  void _initiatePayment() {
+    final authProvider = context.read<AuthProvider>();
+    final totalAmount = widget.meal.discountedPrice * _quantity;
+    final orderId = 'ORD_${DateTime.now().millisecondsSinceEpoch}';
+
+    _razorpayService.openCheckout(
+      amount: totalAmount,
+      orderId: orderId,
+      name: authProvider.user!.name,
+      email: authProvider.user!.email,
+      phone: authProvider.user!.phoneNumber ?? '',
+      description: '${widget.meal.title} x $_quantity',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = context.read<AuthProvider>();
     final orderProvider = context.watch<OrderProvider>();
 
     return Container(
@@ -480,52 +571,14 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
           Padding(
             padding: const EdgeInsets.all(20),
             child: ElevatedButton(
-              onPressed: orderProvider.isLoading
+              onPressed: (_isProcessingPayment || orderProvider.isLoading)
                   ? null
-                  : () async {
-                      final order = OrderModel(
-                        id: '',
-                        userId: authProvider.user!.id,
-                        userName: authProvider.user!.name,
-                        userEmail: authProvider.user!.email,
-                        userPhone: authProvider.user!.phoneNumber,
-                        restaurantId: widget.meal.restaurantId,
-                        restaurantName: widget.meal.restaurantName,
-                        mealId: widget.meal.id,
-                        mealTitle: widget.meal.title,
-                        quantity: _quantity,
-                        pricePerItem: widget.meal.discountedPrice,
-                        totalPrice: widget.meal.discountedPrice * _quantity,
-                        pickupTime: widget.meal.pickupStartTime,
-                        createdAt: DateTime.now(),
-                      );
-
-                      try {
-                        await orderProvider.createOrder(order);
-                        if (!context.mounted) return;
-
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Order placed successfully!'),
-                            backgroundColor: AppColors.success,
-                          ),
-                        );
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(e.toString()),
-                            backgroundColor: AppColors.error,
-                          ),
-                        );
-                      }
-                    },
+                  : _initiatePayment,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.all(18),
                 minimumSize: const Size(double.infinity, 56),
               ),
-              child: orderProvider.isLoading
+              child: (_isProcessingPayment || orderProvider.isLoading)
                   ? const SizedBox(
                       height: 20,
                       width: 20,
