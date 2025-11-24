@@ -329,6 +329,9 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    debugPrint('🎉 Payment Success Handler Called!');
+    debugPrint('Payment ID: ${response.paymentId}');
+
     setState(() => _isProcessingPayment = true);
 
     final authProvider = context.read<AuthProvider>();
@@ -352,16 +355,25 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
     );
 
     try {
+      debugPrint('📝 Creating order in database...');
       await orderProvider.createOrder(order);
       if (!mounted) return;
 
+      debugPrint('✅ Order created successfully!');
       setState(() => _isProcessingPayment = false);
 
       // Close the bottom sheet
+      debugPrint('🚪 Closing bottom sheet...');
       Navigator.pop(context);
 
+      // Wait a bit for the bottom sheet to close
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      if (!mounted) return;
+
       // Navigate to My Orders screen
-      Navigator.push(
+      debugPrint('🧭 Navigating to MyOrdersScreen...');
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => const MyOrdersScreen(),
@@ -369,14 +381,17 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
       );
 
       // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Payment successful! Order placed.'),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Payment successful! Order placed.'),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } catch (e) {
+      debugPrint('❌ Error creating order: $e');
       if (!mounted) return;
       setState(() => _isProcessingPayment = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -389,6 +404,10 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
   }
 
   void _handlePaymentFailure(PaymentFailureResponse response) {
+    debugPrint('❌ Payment Failed!');
+    debugPrint('Error Code: ${response.code}');
+    debugPrint('Error Message: ${response.message}');
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Payment failed: ${response.message}'),
@@ -398,9 +417,14 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
   }
 
   void _initiatePayment() {
+    debugPrint('💳 Initiating payment...');
     final authProvider = context.read<AuthProvider>();
     final totalAmount = widget.meal.discountedPrice * _quantity;
     final orderId = 'ORD_${DateTime.now().millisecondsSinceEpoch}';
+
+    debugPrint('Amount: ₹$totalAmount');
+    debugPrint('Order ID: $orderId');
+    debugPrint('Meal: ${widget.meal.title}');
 
     _razorpayService.openCheckout(
       amount: totalAmount,
