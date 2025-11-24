@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Helper function to check if user is approved
+    function isApproved() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true;
+    }
+
+    // Helper function to check if user is restaurant owner
+    function isRestaurant() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'restaurant';
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Anyone can read user documents (for public profiles)
+      allow read: if isAuthenticated();
+
+      // Users can create their own document during registration
+      // But cannot set isApproved to true for restaurants
+      allow create: if isAuthenticated() &&
+                      request.auth.uid == userId &&
+                      (
+                        // Customers can be auto-approved
+                        (request.resource.data.role == 'customer' && request.resource.data.isApproved == true) ||
+                        // Restaurants must be not approved initially
+                        (request.resource.data.role == 'restaurant' && request.resource.data.isApproved == false)
+                      );
+
+      // Users can update their own profile (except role and isApproved)
+      allow update: if isAuthenticated() &&
+                      request.auth.uid == userId &&
+                      request.resource.data.role == resource.data.role &&
+                      request.resource.data.isApproved == resource.data.isApproved;
+
+      // Admins can update any user (including isApproved field)
+      allow update: if isAdmin();
+
+      // Admins can delete any user (for rejecting restaurants)
+      allow delete: if isAdmin();
+    }
+
+    // Meals collection
+    match /meals/{mealId} {
+      // Anyone can read meals (even unauthenticated for browsing)
+      allow read: if true;
+
+      // Only approved restaurants can create meals
+      allow create: if isAuthenticated() &&
+                      isRestaurant() &&
+                      isApproved();
+
+      // Restaurant owners can update/delete their own meals
+      allow update, delete: if isAuthenticated() &&
+                              resource.data.restaurantId == request.auth.uid;
+
+      // Admins can update/delete any meal
+      allow update, delete: if isAdmin();
+    }
+
+    // Orders collection
+    match /orders/{orderId} {
+      // Users can read their own orders
+      // Restaurants can read orders for their meals
+      // Admins can read all orders
+      allow read: if isAuthenticated() &&
+                    (resource.data.userId == request.auth.uid ||
+                     resource.data.restaurantId == request.auth.uid ||
+                     isAdmin());
+
+      // Authenticated users can create orders
+      allow create: if isAuthenticated();
+
+      // Customers can update their own orders (e.g., cancel)
+      // Restaurants can update orders for their meals (e.g., mark as ready)
+      allow update: if isAuthenticated() &&
+                      (resource.data.userId == request.auth.uid ||
+                       resource.data.restaurantId == request.auth.uid);
+    }
+
+    // Reviews collection (for future implementation)
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() &&
+                              resource.data.userId == request.auth.uid;
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "foodsaver-app-255ac",
+          "appId": "1:1081896455408:android:c66b1a768413eb6a088635",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "foodsaver-app-255ac",
+          "appId": "1:1081896455408:ios:c206147ee338f281088635",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "foodsaver-app-255ac",
+          "appId": "1:1081896455408:ios:c206147ee338f281088635",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "foodsaver-app-255ac",
+          "configurations": {
+            "android": "1:1081896455408:android:c66b1a768413eb6a088635",
+            "ios": "1:1081896455408:ios:c206147ee338f281088635",
+            "macos": "1:1081896455408:ios:c206147ee338f281088635",
+            "web": "1:1081896455408:web:80381629ece7eb15088635"
+          }
+        }
+      }
+    }
+  }
+}
