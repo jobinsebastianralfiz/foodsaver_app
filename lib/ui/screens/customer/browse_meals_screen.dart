@@ -10,6 +10,7 @@ import '../../../providers/auth/auth_provider.dart';
 import '../../../providers/order/order_provider.dart';
 import '../../../data/models/order/order_model.dart';
 import '../../../data/services/payment/razorpay_service.dart';
+import 'my_orders_screen.dart';
 
 class BrowseMealsScreen extends StatefulWidget {
   const BrowseMealsScreen({super.key});
@@ -355,12 +356,24 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
       if (!mounted) return;
 
       setState(() => _isProcessingPayment = false);
+
+      // Close the bottom sheet
       Navigator.pop(context);
+
+      // Navigate to My Orders screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const MyOrdersScreen(),
+        ),
+      );
+
+      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Payment successful! Order ID: ${response.paymentId?.substring(0, 10)}...'),
+          content: Text('Payment successful! Order placed.'),
           backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 3),
         ),
       );
     } catch (e) {
