@@ -98,12 +98,37 @@ service cloud.firestore {
                        resource.data.restaurantId == request.auth.uid);
     }
 
-    // Reviews collection (for future implementation)
+    // Reviews collection
     match /reviews/{reviewId} {
       allow read: if true;
       allow create: if isAuthenticated();
       allow update, delete: if isAuthenticated() &&
                               resource.data.userId == request.auth.uid;
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // Users can read their own notifications (targeted or broadcast)
+      allow read: if isAuthenticated() &&
+                    (resource.data.targetUserId == request.auth.uid ||
+                     resource.data.targetUserId == null);
+
+      // Admins and restaurants can create notifications
+      allow create: if isAuthenticated() &&
+                      (isAdmin() || isRestaurant());
+
+      // Only admins can delete notifications
+      allow delete: if isAdmin();
+
+      // Users can mark their own notifications as read
+      allow update: if isAuthenticated() &&
+                      (resource.data.targetUserId == request.auth.uid ||
+                       resource.data.targetUserId == null) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']) &&
+                      request.resource.data.isRead == true;
+
+      // Admins can update any notification
+      allow update: if isAdmin();
     }
   }
 }
