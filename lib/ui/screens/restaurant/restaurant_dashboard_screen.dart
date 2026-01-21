@@ -29,20 +29,6 @@ class RestaurantDashboardScreen extends StatelessWidget {
             floating: false,
             pinned: true,
             backgroundColor: AppColors.secondary,
-            actions: [
-              IconButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SendNotificationScreen(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.notifications_active),
-                tooltip: 'Send Notification',
-              ),
-            ],
             flexibleSpace: FlexibleSpaceBar(
               title: FadeIn(
                 child: const Text(
@@ -114,9 +100,15 @@ class RestaurantDashboardScreen extends StatelessWidget {
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                icon: const Icon(Icons.notifications_active, color: Colors.white),
+                tooltip: 'Send Notification',
                 onPressed: () {
-                  // TODO: Navigate to notifications
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SendNotificationScreen(),
+                    ),
+                  );
                 },
               ),
               IconButton(

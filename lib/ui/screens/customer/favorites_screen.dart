@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../data/models/meal/meal_model.dart';
@@ -164,7 +165,7 @@ class _FavoriteMealCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image Placeholder with favorite button
+          // Meal Image with favorite button
           Stack(
             children: [
               Container(
@@ -173,8 +174,27 @@ class _FavoriteMealCard extends StatelessWidget {
                   gradient: AppColors.primaryGradient,
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                 ),
-                child: const Center(
-                  child: Icon(Icons.restaurant_menu, size: 48, color: Colors.white),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  child: meal.imageUrl != null && meal.imageUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: meal.imageUrl!,
+                          width: double.infinity,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => const Center(
+                            child: Icon(Icons.restaurant_menu, size: 48, color: Colors.white),
+                          ),
+                        )
+                      : const Center(
+                          child: Icon(Icons.restaurant_menu, size: 48, color: Colors.white),
+                        ),
                 ),
               ),
               Positioned(

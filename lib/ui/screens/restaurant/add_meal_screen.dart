@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
@@ -6,6 +7,8 @@ import '../../../core/theme/text_styles.dart';
 import '../../../data/models/meal/meal_model.dart';
 import '../../../providers/auth/auth_provider.dart';
 import '../../../providers/meal/meal_provider.dart';
+import '../../../data/services/storage/image_service.dart';
+import '../../shared/widgets/image_picker_widget.dart';
 
 class AddMealScreen extends StatefulWidget {
   const AddMealScreen({super.key});
@@ -30,6 +33,10 @@ class _AddMealScreenState extends State<AddMealScreen> {
   bool _isGlutenFree = false;
   final List<String> _allergens = [];
 
+  final ImageService _imageService = ImageService();
+  File? _selectedImage;
+  bool _isUploadingImage = false;
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -38,6 +45,24 @@ class _AddMealScreenState extends State<AddMealScreen> {
     _discountedPriceController.dispose();
     _quantityController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    final file = await _imageService.pickImageFromGallery();
+    if (file != null) {
+      setState(() => _selectedImage = file);
+    }
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    final file = await _imageService.pickImageFromCamera();
+    if (file != null) {
+      setState(() => _selectedImage = file);
+    }
+  }
+
+  void _removeImage() {
+    setState(() => _selectedImage = null);
   }
 
   Future<void> _selectDateTime(BuildContext context, bool isStartTime) async {
@@ -99,12 +124,40 @@ class _AddMealScreenState extends State<AddMealScreen> {
     final authProvider = context.read<AuthProvider>();
     final mealProvider = context.read<MealProvider>();
 
+    String? imageUrl;
+
+    // Upload image if selected
+    if (_selectedImage != null) {
+      setState(() => _isUploadingImage = true);
+      try {
+        // Generate a temporary ID for the meal image
+        final tempMealId = DateTime.now().millisecondsSinceEpoch.toString();
+        imageUrl = await _imageService.uploadMealImage(
+          file: _selectedImage!,
+          restaurantId: authProvider.user!.id,
+          mealId: tempMealId,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image upload failed: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        setState(() => _isUploadingImage = false);
+        return;
+      }
+      setState(() => _isUploadingImage = false);
+    }
+
     final meal = MealModel(
       id: '',
       restaurantId: authProvider.user!.id,
       restaurantName: authProvider.user!.name,
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
+      imageUrl: imageUrl,
       category: _selectedCategory,
       originalPrice: double.parse(_originalPriceController.text),
       discountedPrice: double.parse(_discountedPriceController.text),
@@ -147,6 +200,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
   @override
   Widget build(BuildContext context) {
     final mealProvider = context.watch<MealProvider>();
+    final isLoading = mealProvider.isLoading || _isUploadingImage;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -161,6 +215,23 @@ class _AddMealScreenState extends State<AddMealScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Meal Image Picker
+              FadeInUp(
+                delay: const Duration(milliseconds: 50),
+                child: ImagePickerWidget(
+                  type: ImagePickerType.meal,
+                  selectedImage: _selectedImage,
+                  currentImageUrl: null,
+                  isLoading: _isUploadingImage,
+                  height: 200,
+                  onPickFromGallery: _pickImageFromGallery,
+                  onPickFromCamera: _pickImageFromCamera,
+                  onRemove: _selectedImage != null ? _removeImage : null,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
               // Title
               FadeInUp(
                 delay: const Duration(milliseconds: 100),
@@ -422,19 +493,29 @@ class _AddMealScreenState extends State<AddMealScreen> {
               FadeInUp(
                 delay: const Duration(milliseconds: 900),
                 child: ElevatedButton(
-                  onPressed: mealProvider.isLoading ? null : _handleSaveMeal,
+                  onPressed: isLoading ? null : _handleSaveMeal,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.all(18),
                     backgroundColor: AppColors.secondary,
                   ),
-                  child: mealProvider.isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
+                  child: isLoading
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _isUploadingImage ? 'Uploading image...' : 'Creating meal...',
+                              style: const TextStyle(fontSize: 16, color: Colors.white),
+                            ),
+                          ],
                         )
                       : const Text(
                           'Create Meal',

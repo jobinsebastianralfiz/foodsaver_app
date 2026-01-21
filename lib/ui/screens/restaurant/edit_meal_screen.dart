@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
@@ -5,6 +6,9 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../data/models/meal/meal_model.dart';
 import '../../../providers/meal/meal_provider.dart';
+import '../../../providers/auth/auth_provider.dart';
+import '../../../data/services/storage/image_service.dart';
+import '../../shared/widgets/image_picker_widget.dart';
 
 class EditMealScreen extends StatefulWidget {
   final MealModel meal;
@@ -31,6 +35,11 @@ class _EditMealScreenState extends State<EditMealScreen> {
   late bool _isGlutenFree;
   late List<String> _allergens;
 
+  final ImageService _imageService = ImageService();
+  File? _selectedImage;
+  String? _currentImageUrl;
+  bool _isUploadingImage = false;
+
   @override
   void initState() {
     super.initState();
@@ -48,6 +57,7 @@ class _EditMealScreenState extends State<EditMealScreen> {
     _isVegan = widget.meal.isVegan;
     _isGlutenFree = widget.meal.isGlutenFree;
     _allergens = List.from(widget.meal.allergens);
+    _currentImageUrl = widget.meal.imageUrl;
   }
 
   @override
@@ -58,6 +68,27 @@ class _EditMealScreenState extends State<EditMealScreen> {
     _discountedPriceController.dispose();
     _quantityController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    final file = await _imageService.pickImageFromGallery();
+    if (file != null) {
+      setState(() => _selectedImage = file);
+    }
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    final file = await _imageService.pickImageFromCamera();
+    if (file != null) {
+      setState(() => _selectedImage = file);
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+      _currentImageUrl = null;
+    });
   }
 
   Future<void> _selectDateTime(BuildContext context, bool isStartTime) async {
@@ -109,6 +140,31 @@ class _EditMealScreenState extends State<EditMealScreen> {
     }
 
     final mealProvider = context.read<MealProvider>();
+    final authProvider = context.read<AuthProvider>();
+    String? imageUrl = _currentImageUrl;
+
+    // Upload new image if selected
+    if (_selectedImage != null) {
+      setState(() => _isUploadingImage = true);
+      try {
+        imageUrl = await _imageService.uploadMealImage(
+          file: _selectedImage!,
+          restaurantId: authProvider.user!.id,
+          mealId: widget.meal.id,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image upload failed: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        setState(() => _isUploadingImage = false);
+        return;
+      }
+      setState(() => _isUploadingImage = false);
+    }
 
     // Calculate new available quantity (preserve sold items)
     final newQuantity = int.parse(_quantityController.text);
@@ -118,6 +174,7 @@ class _EditMealScreenState extends State<EditMealScreen> {
     final updates = {
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim(),
+      'imageUrl': imageUrl,
       'category': _selectedCategory.toString().split('.').last,
       'originalPrice': double.parse(_originalPriceController.text),
       'discountedPrice': double.parse(_discountedPriceController.text),
@@ -160,6 +217,7 @@ class _EditMealScreenState extends State<EditMealScreen> {
   @override
   Widget build(BuildContext context) {
     final mealProvider = context.watch<MealProvider>();
+    final isLoading = mealProvider.isLoading || _isUploadingImage;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -174,6 +232,25 @@ class _EditMealScreenState extends State<EditMealScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Meal Image Picker
+              FadeInUp(
+                delay: const Duration(milliseconds: 50),
+                child: ImagePickerWidget(
+                  type: ImagePickerType.meal,
+                  selectedImage: _selectedImage,
+                  currentImageUrl: _currentImageUrl,
+                  isLoading: _isUploadingImage,
+                  height: 200,
+                  onPickFromGallery: _pickImageFromGallery,
+                  onPickFromCamera: _pickImageFromCamera,
+                  onRemove: (_selectedImage != null || _currentImageUrl != null)
+                      ? _removeImage
+                      : null,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
               // Title
               FadeInUp(
                 delay: const Duration(milliseconds: 100),
@@ -436,19 +513,29 @@ class _EditMealScreenState extends State<EditMealScreen> {
               FadeInUp(
                 delay: const Duration(milliseconds: 900),
                 child: ElevatedButton(
-                  onPressed: mealProvider.isLoading ? null : _handleUpdateMeal,
+                  onPressed: isLoading ? null : _handleUpdateMeal,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.all(18),
                     backgroundColor: AppColors.secondary,
                   ),
-                  child: mealProvider.isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
+                  child: isLoading
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _isUploadingImage ? 'Uploading image...' : 'Updating meal...',
+                              style: const TextStyle(fontSize: 16, color: Colors.white),
+                            ),
+                          ],
                         )
                       : const Text(
                           'Update Meal',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../providers/auth/auth_provider.dart';
@@ -760,7 +761,7 @@ class _MealListCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Image
+            // Meal Image
             Container(
               width: 100,
               height: 100,
@@ -768,7 +769,25 @@ class _MealListCard extends StatelessWidget {
                 gradient: AppColors.primaryGradient,
                 borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
               ),
-              child: const Icon(Icons.restaurant_menu, size: 40, color: Colors.white),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                child: meal.imageUrl != null && meal.imageUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: meal.imageUrl!,
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        errorWidget: (context, url, error) =>
+                            const Icon(Icons.restaurant_menu, size: 40, color: Colors.white),
+                      )
+                    : const Icon(Icons.restaurant_menu, size: 40, color: Colors.white),
+              ),
             ),
             // Content
             Expanded(

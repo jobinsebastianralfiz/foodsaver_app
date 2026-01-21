@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
@@ -5,6 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../providers/auth/auth_provider.dart';
+import '../../../data/services/storage/image_service.dart';
+import '../../shared/widgets/image_picker_widget.dart';
 
 class RestaurantProfileScreen extends StatefulWidget {
   const RestaurantProfileScreen({super.key});
@@ -20,6 +23,11 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
   late final TextEditingController _addressController;
   late final TextEditingController _descriptionController;
   bool _isLoading = false;
+  bool _isUploadingImage = false;
+
+  final ImageService _imageService = ImageService();
+  File? _selectedImage;
+  String? _currentImageUrl;
 
   @override
   void initState() {
@@ -29,6 +37,7 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
     _phoneController = TextEditingController(text: user?.phoneNumber ?? '');
     _addressController = TextEditingController();
     _descriptionController = TextEditingController();
+    _currentImageUrl = user?.profilePhoto;
     _loadRestaurantData();
   }
 
@@ -59,6 +68,27 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
     super.dispose();
   }
 
+  Future<void> _pickImageFromGallery() async {
+    final file = await _imageService.pickImageFromGallery();
+    if (file != null) {
+      setState(() => _selectedImage = file);
+    }
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    final file = await _imageService.pickImageFromCamera();
+    if (file != null) {
+      setState(() => _selectedImage = file);
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+      _currentImageUrl = null;
+    });
+  }
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -67,12 +97,39 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final userId = authProvider.user!.id;
+      String? imageUrl = _currentImageUrl;
+
+      // Upload new image if selected
+      if (_selectedImage != null) {
+        setState(() => _isUploadingImage = true);
+        try {
+          imageUrl = await _imageService.uploadProfileImage(
+            file: _selectedImage!,
+            userId: userId,
+          );
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Image upload failed: ${e.toString()}'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+          setState(() {
+            _isLoading = false;
+            _isUploadingImage = false;
+          });
+          return;
+        }
+        setState(() => _isUploadingImage = false);
+      }
 
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
         'name': _nameController.text.trim(),
         'phoneNumber': _phoneController.text.trim(),
         'address': _addressController.text.trim(),
         'description': _descriptionController.text.trim(),
+        'profilePhoto': imageUrl,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -99,7 +156,10 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _isUploadingImage = false;
+        });
       }
     }
   }
@@ -121,16 +181,32 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
           key: _formKey,
           child: Column(
             children: [
-              // Avatar
+              // Profile Image Picker
               FadeInUp(
                 delay: const Duration(milliseconds: 100),
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundColor: AppColors.secondary.withOpacity(0.1),
-                  child: Icon(
-                    Icons.restaurant,
-                    size: 50,
-                    color: AppColors.secondary,
+                child: ImagePickerWidget(
+                  type: ImagePickerType.profile,
+                  selectedImage: _selectedImage,
+                  currentImageUrl: _currentImageUrl,
+                  isLoading: _isUploadingImage,
+                  size: 120,
+                  onPickFromGallery: _pickImageFromGallery,
+                  onPickFromCamera: _pickImageFromCamera,
+                  onRemove: (_selectedImage != null || _currentImageUrl != null)
+                      ? _removeImage
+                      : null,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              FadeInUp(
+                delay: const Duration(milliseconds: 120),
+                child: Text(
+                  'Tap to change logo',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -267,13 +343,23 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
                       backgroundColor: AppColors.secondary,
                     ),
                     child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                _isUploadingImage ? 'Uploading image...' : 'Saving...',
+                                style: const TextStyle(fontSize: 16, color: Colors.white),
+                              ),
+                            ],
                           )
                         : const Text(
                             'Save Changes',

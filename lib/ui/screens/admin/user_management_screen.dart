@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../data/models/user/user_model.dart';
@@ -130,6 +131,43 @@ class _UserCard extends StatelessWidget {
     }
   }
 
+  Widget _buildProfileAvatar(double size) {
+    final imageUrl = user.profilePhoto;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: size / 2,
+        backgroundColor: _getRoleColor().withOpacity(0.1),
+        child: ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: imageUrl,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Icon(
+              _getRoleIcon(),
+              size: size * 0.5,
+              color: _getRoleColor(),
+            ),
+            errorWidget: (context, url, error) => Icon(
+              _getRoleIcon(),
+              size: size * 0.5,
+              color: _getRoleColor(),
+            ),
+          ),
+        ),
+      );
+    }
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: _getRoleColor().withOpacity(0.1),
+      child: Icon(
+        _getRoleIcon(),
+        size: size * 0.5,
+        color: _getRoleColor(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isApproved = userData['isApproved'] ?? true;
@@ -148,10 +186,7 @@ class _UserCard extends StatelessWidget {
         ],
       ),
       child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: _getRoleColor().withOpacity(0.1),
-          child: Icon(_getRoleIcon(), color: _getRoleColor()),
-        ),
+        leading: _buildProfileAvatar(40),
         title: Text(
           user.name,
           style: AppTextStyles.subtitle1.copyWith(
@@ -159,6 +194,7 @@ class _UserCard extends StatelessWidget {
           ),
         ),
         subtitle: Column(
+
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(user.email, style: AppTextStyles.caption),

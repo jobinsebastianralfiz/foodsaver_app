@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../data/models/meal/meal_model.dart';
+import '../../../data/models/order/order_model.dart';
+import '../../../data/repositories/order_repository.dart';
+import '../../../data/services/payment/razorpay_service.dart';
 import '../../../providers/meal/meal_provider.dart';
 import '../../../providers/auth/auth_provider.dart';
 import '../../../providers/order/order_provider.dart';
-import '../../../data/models/order/order_model.dart';
-import '../../../data/services/payment/razorpay_service.dart';
 import 'my_orders_screen.dart';
 
 class BrowseMealsScreen extends StatefulWidget {
@@ -230,35 +231,59 @@ class _MealCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image Placeholder
+            // Meal Image
             Container(
               height: 120,
               decoration: BoxDecoration(
                 gradient: AppColors.primaryGradient,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               ),
-              child: const Center(
-                child: Icon(Icons.restaurant_menu, size: 48, color: Colors.white),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                child: meal.imageUrl != null && meal.imageUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: meal.imageUrl!,
+                        width: double.infinity,
+                        height: 120,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        errorWidget: (context, url, error) {
+                          debugPrint('Error loading meal image: $error');
+                          debugPrint('URL: $url');
+                          return const Center(
+                            child: Icon(Icons.restaurant_menu, size: 48, color: Colors.white),
+                          );
+                        },
+                      )
+                    : const Center(
+                        child: Icon(Icons.restaurant_menu, size: 48, color: Colors.white),
+                      ),
               ),
             ),
 
             // Content
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       meal.title,
-                      style: AppTextStyles.subtitle1,
-                      maxLines: 2,
+                      style: AppTextStyles.subtitle1.copyWith(fontSize: 14),
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       meal.restaurantName,
-                      style: AppTextStyles.caption,
+                      style: AppTextStyles.caption.copyWith(fontSize: 11),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -269,23 +294,26 @@ class _MealCard extends StatelessWidget {
                           '₹${meal.originalPrice.toStringAsFixed(0)}',
                           style: AppTextStyles.caption.copyWith(
                             decoration: TextDecoration.lineThrough,
+                            fontSize: 11,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
                         Text(
                           '₹${meal.discountedPrice.toStringAsFixed(0)}',
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: AppColors.primary,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
                     Text(
                       '${meal.availableQuantity} left',
-                      style: AppTextStyles.caption.copyWith(color: AppColors.warning),
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.warning,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -309,127 +337,94 @@ class _MealDetailsSheet extends StatefulWidget {
 
 class _MealDetailsSheetState extends State<_MealDetailsSheet> {
   int _quantity = 1;
-  late RazorpayService _razorpayService;
-  bool _isProcessingPayment = false;
+  final RazorpayService _razorpayService = RazorpayService();
+
+  late AuthProvider _authProvider;
 
   @override
   void initState() {
     super.initState();
-    _razorpayService = RazorpayService();
-    _razorpayService.initialize(
-      onSuccess: _handlePaymentSuccess,
-      onFailure: _handlePaymentFailure,
-    );
+    // Set callback for when payment completes
+    _razorpayService.onPaymentComplete = _onPaymentComplete;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _authProvider = context.read<AuthProvider>();
   }
 
   @override
   void dispose() {
-    _razorpayService.dispose();
+    // Don't clear callback - it needs to persist
     super.dispose();
   }
 
-  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    debugPrint('🎉 Payment Success Handler Called!');
-    debugPrint('Payment ID: ${response.paymentId}');
+  void _onPaymentComplete() {
+    debugPrint('📱 Payment complete callback received!');
 
-    setState(() => _isProcessingPayment = true);
+    if (_razorpayService.orderCreated) {
+      debugPrint('✅ Order was created! Navigating to orders...');
+      _razorpayService.reset();
 
-    final authProvider = context.read<AuthProvider>();
-    final orderProvider = context.read<OrderProvider>();
+      // Use addPostFrameCallback to ensure navigation happens safely
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pop(); // Close bottom sheet
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MyOrdersScreen()),
+          );
+        }
+      });
+    } else if (_razorpayService.errorMessage != null) {
+      debugPrint('❌ Error: ${_razorpayService.errorMessage}');
+      final error = _razorpayService.errorMessage;
+      _razorpayService.reset();
 
-    final order = OrderModel(
-      id: '',
-      userId: authProvider.user!.id,
-      userName: authProvider.user!.name,
-      userEmail: authProvider.user!.email,
-      userPhone: authProvider.user!.phoneNumber,
-      restaurantId: widget.meal.restaurantId,
-      restaurantName: widget.meal.restaurantName,
-      mealId: widget.meal.id,
-      mealTitle: widget.meal.title,
-      quantity: _quantity,
-      pricePerItem: widget.meal.discountedPrice,
-      totalPrice: widget.meal.discountedPrice * _quantity,
-      pickupTime: widget.meal.pickupStartTime,
-      createdAt: DateTime.now(),
-    );
-
-    try {
-      debugPrint('📝 Creating order in database...');
-      await orderProvider.createOrder(order);
-      if (!mounted) return;
-
-      debugPrint('✅ Order created successfully!');
-
-      if (!mounted) return;
-      setState(() => _isProcessingPayment = false);
-
-      // Close the bottom sheet first
-      debugPrint('🚪 Closing bottom sheet...');
-      if (mounted) {
-        Navigator.pop(context);
-      }
-
-      // Wait a bit for the bottom sheet animation to complete
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      if (!mounted) return;
-
-      // Navigate to My Orders screen and show success message there
-      debugPrint('🧭 Navigating to MyOrdersScreen...');
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const MyOrdersScreen(),
-          ),
-        ).then((_) {
-          // Don't show snackbar after navigation - the new screen will be visible
-        });
-      }
-    } catch (e) {
-      debugPrint('❌ Error creating order: $e');
-      if (!mounted) return;
-      setState(() => _isProcessingPayment = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Payment received but order failed: ${e.toString()}'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {}); // Refresh UI
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error ?? 'Payment failed'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      });
     }
   }
 
-  void _handlePaymentFailure(PaymentFailureResponse response) {
-    debugPrint('❌ Payment Failed!');
-    debugPrint('Error Code: ${response.code}');
-    debugPrint('Error Message: ${response.message}');
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Payment failed: ${response.message}'),
-        backgroundColor: AppColors.error,
-      ),
-    );
-  }
-
   void _initiatePayment() {
-    debugPrint('💳 Initiating payment...');
-    final authProvider = context.read<AuthProvider>();
-    final totalAmount = widget.meal.discountedPrice * _quantity;
-    final orderId = 'ORD_${DateTime.now().millisecondsSinceEpoch}';
+    final user = _authProvider.user!;
+    final meal = widget.meal;
+    final totalAmount = meal.discountedPrice * _quantity;
 
-    debugPrint('Amount: ₹$totalAmount');
-    debugPrint('Order ID: $orderId');
-    debugPrint('Meal: ${widget.meal.title}');
+    final order = OrderModel(
+      id: '',
+      userId: user.id,
+      userName: user.name,
+      userEmail: user.email,
+      userPhone: user.phoneNumber,
+      restaurantId: meal.restaurantId,
+      restaurantName: meal.restaurantName,
+      mealId: meal.id,
+      mealTitle: meal.title,
+      quantity: _quantity,
+      pricePerItem: meal.discountedPrice,
+      totalPrice: totalAmount,
+      pickupTime: meal.pickupStartTime,
+      createdAt: DateTime.now(),
+    );
 
-    _razorpayService.openCheckout(
+    _razorpayService.startPayment(
+      order: order,
+      repository: OrderRepository(),
       amount: totalAmount,
-      orderId: orderId,
-      name: authProvider.user!.name,
-      email: authProvider.user!.email,
-      phone: authProvider.user!.phoneNumber ?? '',
-      description: '${widget.meal.title} x $_quantity',
+      customerName: user.name,
+      customerEmail: user.email,
+      customerPhone: user.phoneNumber ?? '',
+      description: '${meal.title} x $_quantity',
     );
   }
 
@@ -462,6 +457,39 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Meal Image
+                  if (widget.meal.imageUrl != null && widget.meal.imageUrl!.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      height: 200,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: AppColors.background,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: CachedNetworkImage(
+                          imageUrl: widget.meal.imageUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          errorWidget: (context, url, error) {
+                            debugPrint('Error loading meal detail image: $error');
+                            return Container(
+                              decoration: BoxDecoration(
+                                gradient: AppColors.primaryGradient,
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.restaurant_menu, size: 64, color: Colors.white),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+
                   // Title
                   Text(widget.meal.title, style: AppTextStyles.heading2),
                   const SizedBox(height: 8),
@@ -605,14 +633,14 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
           Padding(
             padding: const EdgeInsets.all(20),
             child: ElevatedButton(
-              onPressed: (_isProcessingPayment || orderProvider.isLoading)
+              onPressed: (_razorpayService.isPaymentInProgress || orderProvider.isLoading)
                   ? null
                   : _initiatePayment,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.all(18),
                 minimumSize: const Size(double.infinity, 56),
               ),
-              child: (_isProcessingPayment || orderProvider.isLoading)
+              child: (_razorpayService.isPaymentInProgress || orderProvider.isLoading)
                   ? const SizedBox(
                       height: 20,
                       width: 20,
