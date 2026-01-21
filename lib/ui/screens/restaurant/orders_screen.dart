@@ -112,10 +112,19 @@ class _OrdersList extends StatelessWidget {
   }
 }
 
-class _OrderCard extends StatelessWidget {
+class _OrderCard extends StatefulWidget {
   final OrderModel order;
 
   const _OrderCard({required this.order});
+
+  @override
+  State<_OrderCard> createState() => _OrderCardState();
+}
+
+class _OrderCardState extends State<_OrderCard> {
+  bool _isUpdating = false;
+
+  OrderModel get order => widget.order;
 
   Color _getStatusColor() {
     switch (order.status) {
@@ -132,10 +141,41 @@ class _OrderCard extends StatelessWidget {
     }
   }
 
+  Future<void> _updateStatus(OrderStatus newStatus, String successMessage) async {
+    if (_isUpdating) return;
+
+    setState(() => _isUpdating = true);
+
+    try {
+      debugPrint('🔄 Updating order ${order.id} to $newStatus');
+      final orderProvider = context.read<OrderProvider>();
+      await orderProvider.updateOrderStatus(order.id, newStatus);
+      debugPrint('✅ Order updated successfully');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(successMessage),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error updating order: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update order: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        setState(() => _isUpdating = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final orderProvider = context.read<OrderProvider>();
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -244,112 +284,60 @@ class _OrderCard extends StatelessWidget {
                 // Action Buttons
                 if (order.status != OrderStatus.completed && order.status != OrderStatus.cancelled) ...[
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      if (order.status == OrderStatus.pending)
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              try {
-                                debugPrint('🔄 Confirming order: ${order.id}');
-                                await orderProvider.updateOrderStatus(order.id, OrderStatus.confirmed);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Order confirmed successfully!'),
-                                      backgroundColor: AppColors.success,
-                                    ),
-                                  );
-                                }
-                              } catch (e) {
-                                debugPrint('❌ Error confirming order: $e');
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Failed to confirm order: ${e.toString()}'),
-                                      backgroundColor: AppColors.error,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            icon: const Icon(Icons.check),
-                            label: const Text('Confirm'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
+                  if (_isUpdating)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        if (order.status == OrderStatus.pending)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _updateStatus(
+                                OrderStatus.confirmed,
+                                'Order confirmed! Check the Confirmed tab.',
+                              ),
+                              icon: const Icon(Icons.check),
+                              label: const Text('Confirm'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                              ),
                             ),
                           ),
-                        ),
-                      if (order.status == OrderStatus.confirmed)
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              try {
-                                debugPrint('🔄 Marking order ready: ${order.id}');
-                                await orderProvider.updateOrderStatus(order.id, OrderStatus.ready);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Order marked as ready!'),
-                                      backgroundColor: AppColors.success,
-                                    ),
-                                  );
-                                }
-                              } catch (e) {
-                                debugPrint('❌ Error marking order ready: $e');
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Failed to update order: ${e.toString()}'),
-                                      backgroundColor: AppColors.error,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            icon: const Icon(Icons.done_all),
-                            label: const Text('Mark Ready'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.info,
+                        if (order.status == OrderStatus.confirmed)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _updateStatus(
+                                OrderStatus.ready,
+                                'Order marked ready! Check the Ready tab.',
+                              ),
+                              icon: const Icon(Icons.done_all),
+                              label: const Text('Mark Ready'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.info,
+                              ),
                             ),
                           ),
-                        ),
-                      if (order.status == OrderStatus.ready)
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              try {
-                                debugPrint('🔄 Completing order: ${order.id}');
-                                await orderProvider.updateOrderStatus(order.id, OrderStatus.completed);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Order completed!'),
-                                      backgroundColor: AppColors.success,
-                                    ),
-                                  );
-                                }
-                              } catch (e) {
-                                debugPrint('❌ Error completing order: $e');
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Failed to complete order: ${e.toString()}'),
-                                      backgroundColor: AppColors.error,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            icon: const Icon(Icons.task_alt),
-                            label: const Text('Complete'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.success,
+                        if (order.status == OrderStatus.ready)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _updateStatus(
+                                OrderStatus.completed,
+                                'Order completed! Check the Completed tab.',
+                              ),
+                              icon: const Icon(Icons.task_alt),
+                              label: const Text('Complete'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.success,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ],
             ),

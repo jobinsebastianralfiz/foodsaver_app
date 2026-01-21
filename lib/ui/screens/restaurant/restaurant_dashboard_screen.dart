@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
+import '../../../data/models/review/review_model.dart';
+import '../../../data/repositories/review_repository.dart';
 import '../../../providers/auth/auth_provider.dart';
 import '../admin/send_notification_screen.dart';
 import 'add_meal_screen.dart';
@@ -368,6 +370,33 @@ class RestaurantDashboardScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+
+                  const SizedBox(height: 32),
+
+                  // Customer Reviews Section
+                  FadeInUp(
+                    delay: const Duration(milliseconds: 800),
+                    child: Row(
+                      children: [
+                        Icon(Icons.star, color: AppColors.warning),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Customer Reviews',
+                          style: AppTextStyles.heading3.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Reviews Stream
+                  FadeInUp(
+                    delay: const Duration(milliseconds: 900),
+                    child: _ReviewsSection(restaurantId: user?.id ?? ''),
+                  ),
                 ],
               ),
             ),
@@ -550,5 +579,259 @@ class _ActionCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ReviewsSection extends StatelessWidget {
+  final String restaurantId;
+
+  const _ReviewsSection({required this.restaurantId});
+
+  @override
+  Widget build(BuildContext context) {
+    if (restaurantId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final reviewRepository = ReviewRepository();
+
+    return StreamBuilder<List<ReviewModel>>(
+      stream: reviewRepository.getRestaurantReviews(restaurantId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Text(
+              'Error loading reviews',
+              style: AppTextStyles.body2.copyWith(color: AppColors.error),
+            ),
+          );
+        }
+
+        final reviews = snapshot.data ?? [];
+
+        if (reviews.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.rate_review_outlined,
+                  size: 48,
+                  color: AppColors.textSecondary.withOpacity(0.5),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No reviews yet',
+                  style: AppTextStyles.subtitle1.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Reviews from customers will appear here',
+                  style: AppTextStyles.caption,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Calculate average rating
+        final totalRating = reviews.fold<int>(0, (sum, r) => sum + r.rating);
+        final avgRating = totalRating / reviews.length;
+
+        return Column(
+          children: [
+            // Average Rating Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      avgRating.toStringAsFixed(1),
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: List.generate(5, (index) {
+                            return Icon(
+                              index < avgRating.round()
+                                  ? Icons.star
+                                  : Icons.star_border,
+                              color: AppColors.warning,
+                              size: 20,
+                            );
+                          }),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${reviews.length} review${reviews.length == 1 ? '' : 's'}',
+                          style: AppTextStyles.caption,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Recent Reviews List
+            ...reviews.take(5).map((review) => _ReviewCard(review: review)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  final ReviewModel review;
+
+  const _ReviewCard({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppColors.primary.withOpacity(0.1),
+                child: Text(
+                  review.userName.isNotEmpty ? review.userName[0].toUpperCase() : '?',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      review.userName,
+                      style: AppTextStyles.subtitle2.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      review.mealTitle,
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Row(
+                children: List.generate(5, (index) {
+                  return Icon(
+                    index < review.rating ? Icons.star : Icons.star_border,
+                    color: AppColors.warning,
+                    size: 16,
+                  );
+                }),
+              ),
+            ],
+          ),
+          if (review.comment.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              review.comment,
+              style: AppTextStyles.body2,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            _formatDate(review.createdAt),
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inDays == 0) {
+      if (diff.inHours == 0) {
+        return '${diff.inMinutes} min ago';
+      }
+      return '${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
+    } else if (diff.inDays == 1) {
+      return 'Yesterday';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays} days ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
   }
 }
