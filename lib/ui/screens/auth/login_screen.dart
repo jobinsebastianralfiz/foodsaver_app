@@ -75,24 +75,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           children: [
                             // Logo
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                gradient: AppColors.primaryGradient,
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.primary.withOpacity(0.3),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.restaurant_menu,
-                                size: 40,
-                                color: Colors.white,
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: Image.asset(
+                                'assets/images/logo.jpg',
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.contain,
                               ),
                             ),
                             const SizedBox(height: 24),
@@ -169,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _obscurePassword
                                     ? Icons.visibility_off_outlined
 
-                                    : Icons.  visibility_outlined
+                                    : Icons.visibility_outlined
                               ),
                               onPressed: () {
                                 setState(() {

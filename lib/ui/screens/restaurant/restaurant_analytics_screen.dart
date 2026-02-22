@@ -141,7 +141,7 @@ class RestaurantAnalyticsScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '\$${totalRevenue.toStringAsFixed(2)}',
+                          '₹${totalRevenue.toStringAsFixed(2)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 36,
@@ -335,7 +335,7 @@ class _OrderListItem extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '\$${order.totalPrice.toStringAsFixed(2)}',
+                '₹${order.totalPrice.toStringAsFixed(2)}',
                 style: AppTextStyles.subtitle1.copyWith(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w700,

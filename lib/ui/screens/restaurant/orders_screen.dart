@@ -251,7 +251,7 @@ class _OrderCardState extends State<_OrderCard> {
                     Text('Quantity: ${order.quantity}', style: AppTextStyles.body2),
                     const Spacer(),
                     Text(
-                      '\$${order.totalPrice.toStringAsFixed(2)}',
+                      '₹${order.totalPrice.toStringAsFixed(2)}',
                       style: AppTextStyles.subtitle1.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w700,

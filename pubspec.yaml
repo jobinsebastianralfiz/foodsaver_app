@@ -80,6 +80,24 @@ dev_dependencies:
   # Testing
   mockito: ^5.4.4
 
+  # App Icon & Splash
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.jpg"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/logo.jpg"
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "assets/images/logo.jpg"
+  android_12:
+    image: "assets/images/logo.jpg"
+    color: "#FFFFFF"
+
 flutter:
   uses-material-design: true
 

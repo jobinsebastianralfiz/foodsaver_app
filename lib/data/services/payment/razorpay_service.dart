@@ -11,7 +11,7 @@ class RazorpayService {
   Razorpay? _razorpay;
 
   // Your Razorpay Test Credentials
-  static const String _keyId = 'rzp_test_S6VTC8xoPOYNxx';
+  static const String _keyId = 'rzp_test_SHXkRbcNWvrk0G';
 
   // Payment state
   OrderModel? pendingOrder;

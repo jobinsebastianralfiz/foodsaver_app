@@ -376,7 +376,7 @@ class _RestaurantCard extends StatelessWidget {
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
                           title: Text(meal['title'] ?? 'Untitled'),
-                          subtitle: Text('\$${meal['discountedPrice']} • ${meal['availableQuantity']}/${meal['quantity']} left'),
+                          subtitle: Text('₹${meal['discountedPrice']} • ${meal['availableQuantity']}/${meal['quantity']} left'),
                           trailing: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(

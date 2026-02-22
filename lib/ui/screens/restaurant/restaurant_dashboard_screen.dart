@@ -170,7 +170,7 @@ class RestaurantDashboardScreen extends StatelessWidget {
                           child: _StatCard(
                             icon: Icons.attach_money,
                             title: 'Revenue',
-                            value: '\$0',
+                            value: '₹0',
                             color: AppColors.success,
                           ),
                         ),

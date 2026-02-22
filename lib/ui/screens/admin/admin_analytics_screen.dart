@@ -197,7 +197,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        '\$${totalRevenue.toStringAsFixed(2)}',
+                                        '₹${totalRevenue.toStringAsFixed(2)}',
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 32,

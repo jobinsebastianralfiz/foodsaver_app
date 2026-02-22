@@ -176,7 +176,7 @@ class _OrderCard extends StatelessWidget {
                 _InfoRow(
                   icon: Icons.attach_money,
                   label: 'Total',
-                  value: '\$${order.totalPrice.toStringAsFixed(2)}',
+                  value: '₹${order.totalPrice.toStringAsFixed(2)}',
                 ),
                 const SizedBox(height: 8),
                 _InfoRow(

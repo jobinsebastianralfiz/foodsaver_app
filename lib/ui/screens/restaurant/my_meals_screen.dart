@@ -202,14 +202,14 @@ class _MealCard extends StatelessWidget {
                     Icon(Icons.attach_money, size: 16, color: AppColors.textSecondary),
                     const SizedBox(width: 4),
                     Text(
-                      '\$${meal.originalPrice}',
+                      '₹${meal.originalPrice}',
                       style: AppTextStyles.caption.copyWith(
                         decoration: TextDecoration.lineThrough,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '\$${meal.discountedPrice}',
+                      '₹${meal.discountedPrice}',
                       style: AppTextStyles.subtitle1.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w700,

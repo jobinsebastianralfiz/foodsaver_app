@@ -252,7 +252,7 @@ class _MealCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      '\$${meal.discountedPrice.toStringAsFixed(2)}',
+                      '₹${meal.discountedPrice.toStringAsFixed(2)}',
                       style: AppTextStyles.subtitle1.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w700,
@@ -260,7 +260,7 @@ class _MealCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '(was \$${meal.originalPrice.toStringAsFixed(2)})',
+                      '(was ₹${meal.originalPrice.toStringAsFixed(2)})',
                       style: AppTextStyles.caption.copyWith(
                         decoration: TextDecoration.lineThrough,
                       ),

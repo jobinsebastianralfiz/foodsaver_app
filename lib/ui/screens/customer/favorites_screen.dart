@@ -237,14 +237,14 @@ class _FavoriteMealCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        '\$${meal.originalPrice}',
+                        '₹${meal.originalPrice}',
                         style: AppTextStyles.caption.copyWith(
                           decoration: TextDecoration.lineThrough,
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '\$${meal.discountedPrice}',
+                        '₹${meal.discountedPrice}',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
