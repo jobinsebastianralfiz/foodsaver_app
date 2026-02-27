@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../../core/constants/app_colors.dart';
@@ -196,41 +196,12 @@ class _RestaurantCard extends StatelessWidget {
                       ),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () async {
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Suspend Restaurant?'),
-                            content: Text('Suspend ${restaurant.name}?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: AppColors.warning,
-                                ),
-                                child: const Text('Suspend'),
-                              ),
-                            ],
-                          ),
-                        );
-
-                        if (confirmed == true && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Suspend restaurant functionality coming soon!'),
-                            ),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.block, size: 18),
-                      label: const Text('Suspend'),
+                      onPressed: () => _deleteRestaurant(context, restaurantId, restaurant.name),
+                      icon: const Icon(Icons.delete, size: 18),
+                      label: const Text('Delete'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.warning,
-                        side: const BorderSide(color: AppColors.warning),
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
                       ),
                     ),
                   ],
@@ -241,6 +212,72 @@ class _RestaurantCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _deleteRestaurant(BuildContext context, String restaurantId, String restaurantName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Restaurant?'),
+        content: Text(
+          'Are you sure you want to delete "$restaurantName"?\n\n'
+          'This will also delete all meals added by this restaurant. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      try {
+        final firestore = FirebaseFirestore.instance;
+
+        // Delete all meals by this restaurant
+        final mealsSnapshot = await firestore
+            .collection('meals')
+            .where('restaurantId', isEqualTo: restaurantId)
+            .get();
+
+        final batch = firestore.batch();
+        for (final meal in mealsSnapshot.docs) {
+          batch.delete(meal.reference);
+        }
+
+        // Delete the restaurant user document
+        batch.delete(firestore.collection('users').doc(restaurantId));
+
+        await batch.commit();
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '$restaurantName and ${mealsSnapshot.docs.length} meal(s) deleted successfully',
+              ),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${e.toString()}'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _showRestaurantDetails(BuildContext context, UserModel restaurant, Map<String, dynamic> data) {

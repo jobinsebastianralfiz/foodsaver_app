@@ -1,6 +1,6 @@
 {
-    "name": "foodsaver_app",
-    "short_name": "foodsaver_app",
+    "name": "GreenBite",
+    "short_name": "GreenBite",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

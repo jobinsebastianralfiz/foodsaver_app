@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/notification/notification_model.dart';
@@ -39,18 +40,57 @@ class NotificationRepository {
 
   // Get user notifications stream (both targeted and general)
   Stream<List<NotificationModel>> getUserNotifications(String userId) {
-    return _firestore
+    // Firestore doesn't allow null in whereIn, so we merge two streams
+    final userStream = _firestore
         .collection('notifications')
-        .where('targetUserId', whereIn: [userId, null])
+        .where('targetUserId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
         .handleError((error) {
-          _logFirestoreError(error, 'getUserNotifications');
-        })
-        .map((snapshot) => snapshot.docs
-            .map((doc) => NotificationModel.fromFirestore(doc))
-            .toList());
+          _logFirestoreError(error, 'getUserNotifications (user)');
+        });
+
+    final generalStream = _firestore
+        .collection('notifications')
+        .where('targetUserId', isNull: true)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .handleError((error) {
+          _logFirestoreError(error, 'getUserNotifications (general)');
+        });
+
+    final controller = StreamController<List<NotificationModel>>();
+    QuerySnapshot? lastUserSnap;
+    QuerySnapshot? lastGeneralSnap;
+
+    void merge() {
+      if (lastUserSnap == null || lastGeneralSnap == null) return;
+      final allDocs = [...lastUserSnap!.docs, ...lastGeneralSnap!.docs];
+      allDocs.sort((a, b) {
+        final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+        final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
+      controller.add(
+        allDocs.take(50).map((doc) => NotificationModel.fromFirestore(doc)).toList(),
+      );
+    }
+
+    final sub1 = userStream.listen((snap) { lastUserSnap = snap; merge(); });
+    final sub2 = generalStream.listen((snap) { lastGeneralSnap = snap; merge(); });
+
+    controller.onCancel = () {
+      sub1.cancel();
+      sub2.cancel();
+      controller.close();
+    };
+
+    return controller.stream;
   }
 
   // Get all notifications (admin view)
@@ -83,14 +123,20 @@ class NotificationRepository {
   // Mark all user notifications as read
   Future<void> markAllAsRead(String userId) async {
     try {
-      final snapshot = await _firestore
+      final userSnapshot = await _firestore
           .collection('notifications')
-          .where('targetUserId', whereIn: [userId, null])
+          .where('targetUserId', isEqualTo: userId)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      final generalSnapshot = await _firestore
+          .collection('notifications')
+          .where('targetUserId', isNull: true)
           .where('isRead', isEqualTo: false)
           .get();
 
       final batch = _firestore.batch();
-      for (var doc in snapshot.docs) {
+      for (var doc in [...userSnapshot.docs, ...generalSnapshot.docs]) {
         batch.update(doc.reference, {'isRead': true});
       }
       await batch.commit();
@@ -113,13 +159,19 @@ class NotificationRepository {
   // Get unread count for user
   Future<int> getUnreadCount(String userId) async {
     try {
-      final snapshot = await _firestore
+      final userSnapshot = await _firestore
           .collection('notifications')
-          .where('targetUserId', whereIn: [userId, null])
+          .where('targetUserId', isEqualTo: userId)
           .where('isRead', isEqualTo: false)
           .get();
 
-      return snapshot.docs.length;
+      final generalSnapshot = await _firestore
+          .collection('notifications')
+          .where('targetUserId', isNull: true)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      return userSnapshot.docs.length + generalSnapshot.docs.length;
     } catch (e) {
       _logFirestoreError(e, 'getUnreadCount');
       return 0;

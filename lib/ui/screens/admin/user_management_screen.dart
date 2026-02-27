@@ -65,7 +65,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final users = snapshot.data?.docs ?? [];
+          final users = (snapshot.data?.docs ?? []).where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return data['role'] != 'admin';
+          }).toList();
 
           if (users.isEmpty) {
             return Center(

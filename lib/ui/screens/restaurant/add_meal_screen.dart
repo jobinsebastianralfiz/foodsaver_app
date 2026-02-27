@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../data/models/meal/meal_model.dart';
@@ -124,6 +125,21 @@ class _AddMealScreenState extends State<AddMealScreen> {
     final authProvider = context.read<AuthProvider>();
     final mealProvider = context.read<MealProvider>();
 
+    // Fetch restaurant's location from Firestore
+    double? restaurantLat;
+    double? restaurantLng;
+    String? restaurantCity;
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(authProvider.user!.id)
+          .get();
+      final data = userDoc.data();
+      restaurantLat = (data?['latitude'] as num?)?.toDouble();
+      restaurantLng = (data?['longitude'] as num?)?.toDouble();
+      restaurantCity = data?['city'];
+    } catch (_) {}
+
     String? imageUrl;
 
     // Upload image if selected
@@ -169,6 +185,9 @@ class _AddMealScreenState extends State<AddMealScreen> {
       isVegan: _isVegan,
       isGlutenFree: _isGlutenFree,
       allergens: _allergens,
+      latitude: restaurantLat,
+      longitude: restaurantLng,
+      city: restaurantCity,
       createdAt: DateTime.now(),
     );
 

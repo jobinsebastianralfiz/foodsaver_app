@@ -96,13 +96,13 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  runApp(FoodSaverApp(prefsService: prefsService));
+  runApp(GreenBiteApp(prefsService: prefsService));
 }
 
-class FoodSaverApp extends StatelessWidget {
+class GreenBiteApp extends StatelessWidget {
   final SharedPreferencesService prefsService;
 
-  const FoodSaverApp({super.key, required this.prefsService});
+  const GreenBiteApp({super.key, required this.prefsService});
 
   @override
   Widget build(BuildContext context) {

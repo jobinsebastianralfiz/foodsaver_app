@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../data/models/user/user_model.dart';
+import '../../../data/services/location/location_service.dart';
 import '../../../providers/auth/auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -26,6 +28,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
+  // Location fields for restaurant
+  final LocationService _locationService = LocationService();
+  bool _isFetchingLocation = false;
+  double? _latitude;
+  double? _longitude;
+  String? _city;
+  String? _address;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -36,8 +46,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  Future<void> _fetchLocation() async {
+    setState(() => _isFetchingLocation = true);
+    try {
+      final result = await _locationService.getCurrentLocation();
+      if (!mounted) return;
+      setState(() {
+        _latitude = result.latitude;
+        _longitude = result.longitude;
+        _city = result.city;
+        _address = result.address;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isFetchingLocation = false);
+    }
+  }
+
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Require location for restaurant registration
+    if (_selectedRole == UserRole.restaurant && _latitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fetch your restaurant location before registering.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     final authProvider = context.read<AuthProvider>();
 
@@ -47,9 +92,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: _passwordController.text,
         name: _nameController.text.trim(),
         role: _selectedRole,
-        phoneNumber: _phoneController.text.trim().isEmpty
-            ? null
-            : _phoneController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
+        latitude: _selectedRole == UserRole.restaurant ? _latitude : null,
+        longitude: _selectedRole == UserRole.restaurant ? _longitude : null,
+        city: _selectedRole == UserRole.restaurant ? _city : null,
+        address: _selectedRole == UserRole.restaurant ? _address : null,
       );
 
       if (!mounted) return;
@@ -61,7 +108,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // For customers, navigation is handled automatically by the Consumer in main.dart
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registration successful! Welcome to FoodSaver!'),
+            content: Text('Registration successful! Welcome to GreenBite!'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -152,7 +199,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                             // Subtitle
                             Text(
-                              'Join FoodSaver and help reduce food waste',
+                              'Join GreenBite and help reduce food waste',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
@@ -286,13 +333,112 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
                           textInputAction: TextInputAction.next,
+                          maxLength: 10,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
                           decoration: const InputDecoration(
-                            labelText: 'Phone Number (Optional)',
+                            labelText: 'Phone Number',
                             hintText: 'Enter your phone number',
                             prefixIcon: Icon(Icons.phone_outlined),
+                            counterText: '',
                           ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your phone number';
+                            }
+                            if (value.length != 10) {
+                              return 'Please enter a valid 10-digit phone number';
+                            }
+                            return null;
+                          },
                         ),
                       ),
+
+                      // Location Fetch (Restaurant only)
+                      if (_selectedRole == UserRole.restaurant) ...[
+                        const SizedBox(height: 20),
+                        FadeInUp(
+                          delay: const Duration(milliseconds: 450),
+                          duration: const Duration(milliseconds: 600),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Restaurant Location',
+                                  style: AppTextStyles.subtitle2.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                if (_address != null) ...[
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.location_on, color: AppColors.primary, size: 20),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _address!,
+                                          style: AppTextStyles.body2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (_city != null && _city!.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const SizedBox(width: 28),
+                                        Text(
+                                          'City: $_city',
+                                          style: AppTextStyles.caption.copyWith(
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                  const SizedBox(height: 12),
+                                ],
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: _isFetchingLocation ? null : _fetchLocation,
+                                    icon: _isFetchingLocation
+                                        ? const SizedBox(
+                                            height: 16,
+                                            width: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          )
+                                        : const Icon(Icons.my_location),
+                                    label: Text(
+                                      _isFetchingLocation
+                                          ? 'Fetching location...'
+                                          : _address != null
+                                              ? 'Re-fetch Location'
+                                              : 'Fetch Current Location',
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.all(14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
 
                       const SizedBox(height: 20),
 
@@ -311,8 +457,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscurePassword
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
                               ),
                               onPressed: () {
                                 setState(() {
@@ -351,8 +497,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscureConfirmPassword
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
                               ),
                               onPressed: () {
                                 setState(() {

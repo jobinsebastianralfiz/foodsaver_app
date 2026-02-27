@@ -1,6 +1,6 @@
 class AppStrings {
   // App Name
-  static const String appName = 'FoodSaver';
+  static const String appName = 'GreenBite';
   static const String appTagline = 'Save Food, Save Money';
   static const String appDescription =
       'Join us in reducing food waste while enjoying quality meals at discounted prices';

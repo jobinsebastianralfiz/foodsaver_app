@@ -8,7 +8,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('FoodSaver app basic test', (WidgetTester tester) async {
+  testWidgets('GreenBite app basic test', (WidgetTester tester) async {
     // This is a placeholder test
     // Real tests would require Firebase initialization which is complex in test environment
     expect(true, isTrue);

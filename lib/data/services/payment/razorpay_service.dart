@@ -122,11 +122,11 @@ class RazorpayService {
       'key': _keyId,
       'amount': amountInPaise,
       'currency': 'INR',
-      'name': 'FoodSaver',
+      'name': 'GreenBite',
       'description': description,
       'prefill': {
         'name': customerName,
-        'email': customerEmail.isNotEmpty ? customerEmail : 'customer@foodsaver.com',
+        'email': customerEmail.isNotEmpty ? customerEmail : 'customer@greenbite.com',
         'contact': customerPhone.isNotEmpty ? customerPhone : '9999999999',
       },
       'theme': {

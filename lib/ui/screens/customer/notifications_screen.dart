@@ -141,6 +141,7 @@ class NotificationsScreen extends StatelessWidget {
               return FadeInUp(
                 delay: Duration(milliseconds: 50 * index),
                 child: _NotificationCard(
+
                   notification: notification,
                   icon: _getIconForType(notification.type),
                   color: _getColorForType(notification.type),
@@ -150,28 +151,6 @@ class NotificationsScreen extends StatelessWidget {
                         await notificationProvider.markAsRead(notification.id);
                       } catch (e) {
                         debugPrint('Error marking as read: $e');
-                      }
-                    }
-                  },
-                  onDelete: () async {
-                    try {
-                      await notificationProvider.deleteNotification(notification.id);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Notification deleted'),
-                            backgroundColor: AppColors.success,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error: ${e.toString()}'),
-                            backgroundColor: AppColors.error,
-                          ),
-                        );
                       }
                     }
                   },
@@ -190,33 +169,17 @@ class _NotificationCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
 
   const _NotificationCard({
     required this.notification,
     required this.icon,
     required this.color,
     required this.onTap,
-    required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      key: Key(notification.id),
-      direction: DismissDirection.endToStart,
-      onDismissed: (_) => onDelete(),
-      background: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: AppColors.error,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      child: Container(
+    return Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: notification.isRead ? Colors.white : AppColors.primary.withOpacity(0.05),
@@ -299,7 +262,7 @@ class _NotificationCard extends StatelessWidget {
           ),
           isThreeLine: true,
         ),
-      ),
+
     );
   }
 }

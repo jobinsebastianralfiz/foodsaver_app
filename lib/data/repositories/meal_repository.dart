@@ -97,6 +97,22 @@ class MealRepository {
             snapshot.docs.map((doc) => MealModel.fromFirestore(doc)).toList());
   }
 
+  // Get available meals filtered by city
+  Stream<List<MealModel>> getAvailableMealsByCity(String city) {
+    return _firestore
+        .collection('meals')
+        .where('status', isEqualTo: 'available')
+        .where('availableQuantity', isGreaterThan: 0)
+        .where('city', isEqualTo: city)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .handleError((error) {
+          _logFirestoreError(error, 'getAvailableMealsByCity');
+        })
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => MealModel.fromFirestore(doc)).toList());
+  }
+
   // Update meal
   Future<void> updateMeal(String mealId, Map<String, dynamic> updates) async {
     try {

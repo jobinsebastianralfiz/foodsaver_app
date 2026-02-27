@@ -2,19 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../data/models/meal/meal_model.dart';
 import '../../../data/models/order/order_model.dart';
 import '../../../data/repositories/order_repository.dart';
 import '../../../data/services/payment/razorpay_service.dart';
+import '../../../data/services/location/location_service.dart';
 import '../../../providers/meal/meal_provider.dart';
 import '../../../providers/auth/auth_provider.dart';
 import '../../../providers/order/order_provider.dart';
 import 'my_orders_screen.dart';
 
 class BrowseMealsScreen extends StatefulWidget {
-  const BrowseMealsScreen({super.key});
+  final String? selectedCity;
+  final double? userLat;
+  final double? userLng;
+
+  const BrowseMealsScreen({
+    super.key,
+    this.selectedCity,
+    this.userLat,
+    this.userLng,
+  });
 
   @override
   State<BrowseMealsScreen> createState() => _BrowseMealsScreenState();
@@ -32,24 +43,56 @@ class _BrowseMealsScreenState extends State<BrowseMealsScreen> {
   }
 
   List<MealModel> _filterMeals(List<MealModel> meals) {
-    if (_searchQuery.isEmpty) return meals;
-
-    return meals.where((meal) {
+    var filtered = meals;
+    if (_searchQuery.isNotEmpty) {
       final searchLower = _searchQuery.toLowerCase();
-      return meal.title.toLowerCase().contains(searchLower) ||
-             meal.description.toLowerCase().contains(searchLower) ||
-             meal.restaurantName.toLowerCase().contains(searchLower);
-    }).toList();
+      filtered = filtered.where((meal) {
+        return meal.title.toLowerCase().contains(searchLower) ||
+               meal.description.toLowerCase().contains(searchLower) ||
+               meal.restaurantName.toLowerCase().contains(searchLower);
+      }).toList();
+    }
+    return filtered;
+  }
+
+  List<MealModel> _sortByDistance(List<MealModel> meals) {
+    if (widget.userLat == null || widget.userLng == null) return meals;
+    final sorted = List<MealModel>.from(meals);
+    sorted.sort((a, b) {
+      final distA = (a.latitude != null && a.longitude != null)
+          ? LocationService.calculateDistance(widget.userLat!, widget.userLng!, a.latitude!, a.longitude!)
+          : double.infinity;
+      final distB = (b.latitude != null && b.longitude != null)
+          ? LocationService.calculateDistance(widget.userLat!, widget.userLng!, b.latitude!, b.longitude!)
+          : double.infinity;
+      return distA.compareTo(distB);
+    });
+    return sorted;
+  }
+
+  String _getDistanceText(MealModel meal) {
+    if (widget.userLat == null || widget.userLng == null ||
+        meal.latitude == null || meal.longitude == null) {
+      return '';
+    }
+    final dist = LocationService.calculateDistance(
+      widget.userLat!, widget.userLng!, meal.latitude!, meal.longitude!,
+    );
+    if (dist < 1) {
+      return '${(dist * 1000).toStringAsFixed(0)} m away';
+    }
+    return '${dist.toStringAsFixed(1)} km away';
   }
 
   @override
   Widget build(BuildContext context) {
     final mealProvider = context.watch<MealProvider>();
+    final cityFilter = widget.selectedCity ?? '';
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Browse Meals'),
+        title: Text(cityFilter.isNotEmpty ? 'Meals in $cityFilter' : 'Browse Meals'),
         backgroundColor: AppColors.primary,
       ),
       body: Column(
@@ -112,7 +155,9 @@ class _BrowseMealsScreenState extends State<BrowseMealsScreen> {
           Expanded(
             child: StreamBuilder<List<MealModel>>(
               stream: _selectedCategory == null
-                  ? mealProvider.getAvailableMeals()
+                  ? (cityFilter.isNotEmpty
+                      ? mealProvider.getAvailableMealsByCity(cityFilter)
+                      : mealProvider.getAvailableMeals())
                   : mealProvider.getMealsByCategory(_selectedCategory!),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -124,7 +169,8 @@ class _BrowseMealsScreenState extends State<BrowseMealsScreen> {
                 }
 
                 final allMeals = snapshot.data ?? [];
-                final meals = _filterMeals(allMeals);
+                final filtered = _filterMeals(allMeals);
+                final meals = _sortByDistance(filtered);
 
                 if (meals.isEmpty) {
                   return Center(
@@ -139,22 +185,36 @@ class _BrowseMealsScreenState extends State<BrowseMealsScreen> {
                   );
                 }
 
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: meals.length,
-                  itemBuilder: (context, index) {
-                    return FadeInUp(
-                      delay: Duration(milliseconds: 100 * index),
-                      child: _MealCard(
-                        meal: meals[index],
-                        onTap: () => _showMealDetails(context, meals[index]),
+                final userId = context.read<AuthProvider>().user!.id;
+                return StreamBuilder<DocumentSnapshot>(
+                  stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
+                  builder: (context, userSnapshot) {
+                    final favorites = (userSnapshot.data?.data() as Map<String, dynamic>?)?['favorites'] as List<dynamic>? ?? [];
+
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 0.68,
                       ),
+                      itemCount: meals.length,
+                      itemBuilder: (context, index) {
+                        final meal = meals[index];
+                        final isFavorite = favorites.contains(meal.id);
+                        final distanceText = _getDistanceText(meal);
+                        return FadeInUp(
+                          delay: Duration(milliseconds: 100 * index),
+                          child: _MealCard(
+                            meal: meal,
+                            isFavorite: isFavorite,
+                            distanceText: distanceText,
+                            onTap: () => _showMealDetails(context, meal),
+                            onFavoriteToggle: () => _toggleFavorite(context, userId, meal.id, isFavorite),
+                          ),
+                        );
+                      },
                     );
                   },
                 );
@@ -164,6 +224,23 @@ class _BrowseMealsScreenState extends State<BrowseMealsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _toggleFavorite(BuildContext context, String userId, String mealId, bool isFavorite) async {
+    try {
+      final userDoc = FirebaseFirestore.instance.collection('users').doc(userId);
+      if (isFavorite) {
+        await userDoc.update({'favorites': FieldValue.arrayRemove([mealId])});
+      } else {
+        await userDoc.update({'favorites': FieldValue.arrayUnion([mealId])});
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   void _showMealDetails(BuildContext context, MealModel meal) {
@@ -208,9 +285,18 @@ class _CategoryChip extends StatelessWidget {
 
 class _MealCard extends StatelessWidget {
   final MealModel meal;
+  final bool isFavorite;
+  final String distanceText;
   final VoidCallback onTap;
+  final VoidCallback onFavoriteToggle;
 
-  const _MealCard({required this.meal, required this.onTap});
+  const _MealCard({
+    required this.meal,
+    required this.isFavorite,
+    required this.distanceText,
+    required this.onTap,
+    required this.onFavoriteToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -232,38 +318,58 @@ class _MealCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Meal Image
-            Container(
-              height: 120,
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              ),
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: meal.imageUrl != null && meal.imageUrl!.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: meal.imageUrl!,
-                        width: double.infinity,
-                        height: 120,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        ),
-                        errorWidget: (context, url, error) {
-                          debugPrint('Error loading meal image: $error');
-                          debugPrint('URL: $url');
-                          return const Center(
+            Stack(
+              children: [
+                Container(
+                  height: 120,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                    child: meal.imageUrl != null && meal.imageUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: meal.imageUrl!,
+                            width: double.infinity,
+                            height: 120,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => const Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                            errorWidget: (context, url, error) {
+                              debugPrint('Error loading meal image: $error');
+                              debugPrint('URL: $url');
+                              return const Center(
+                                child: Icon(Icons.restaurant_menu, size: 48, color: Colors.white),
+                              );
+                            },
+                          )
+                        : const Center(
                             child: Icon(Icons.restaurant_menu, size: 48, color: Colors.white),
-                          );
-                        },
-                      )
-                    : const Center(
-                        child: Icon(Icons.restaurant_menu, size: 48, color: Colors.white),
+                          ),
+                  ),
+                ),
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: GestureDetector(
+                    onTap: onFavoriteToggle,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.white,
+                      radius: 14,
+                      child: Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorite ? Colors.red : AppColors.textSecondary,
+                        size: 16,
                       ),
-              ),
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             // Content
@@ -287,6 +393,22 @@ class _MealCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (distanceText.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, size: 10, color: AppColors.primary),
+                          const SizedBox(width: 2),
+                          Text(
+                            distanceText,
+                            style: AppTextStyles.caption.copyWith(
+                              fontSize: 10,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const Spacer(),
                     Row(
                       children: [
@@ -361,10 +483,10 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
   }
 
   void _onPaymentComplete() {
-    debugPrint('📱 Payment complete callback received!');
+    debugPrint('Payment complete callback received!');
 
     if (_razorpayService.orderCreated) {
-      debugPrint('✅ Order was created! Navigating to orders...');
+      debugPrint('Order was created! Navigating to orders...');
       _razorpayService.reset();
 
       // Use addPostFrameCallback to ensure navigation happens safely
@@ -377,7 +499,7 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
         }
       });
     } else if (_razorpayService.errorMessage != null) {
-      debugPrint('❌ Error: ${_razorpayService.errorMessage}');
+      debugPrint('Error: ${_razorpayService.errorMessage}');
       final error = _razorpayService.errorMessage;
       _razorpayService.reset();
 
@@ -490,8 +612,16 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
                       ),
                     ),
 
-                  // Title
-                  Text(widget.meal.title, style: AppTextStyles.heading2),
+                  // Title with Favorite
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(widget.meal.title, style: AppTextStyles.heading2),
+                      ),
+                      _FavoriteButton(mealId: widget.meal.id),
+                    ],
+                  ),
                   const SizedBox(height: 8),
                   Text(widget.meal.restaurantName, style: AppTextStyles.body2),
                   const SizedBox(height: 16),
@@ -657,6 +787,40 @@ class _MealDetailsSheetState extends State<_MealDetailsSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _FavoriteButton extends StatelessWidget {
+  final String mealId;
+
+  const _FavoriteButton({required this.mealId});
+
+  @override
+  Widget build(BuildContext context) {
+    final userId = context.read<AuthProvider>().user!.id;
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
+      builder: (context, snapshot) {
+        final favorites = (snapshot.data?.data() as Map<String, dynamic>?)?['favorites'] as List<dynamic>? ?? [];
+        final isFavorite = favorites.contains(mealId);
+
+        return IconButton(
+          icon: Icon(
+            isFavorite ? Icons.favorite : Icons.favorite_border,
+            color: isFavorite ? Colors.red : AppColors.textSecondary,
+          ),
+          onPressed: () async {
+            final userDoc = FirebaseFirestore.instance.collection('users').doc(userId);
+            if (isFavorite) {
+              await userDoc.update({'favorites': FieldValue.arrayRemove([mealId])});
+            } else {
+              await userDoc.update({'favorites': FieldValue.arrayUnion([mealId])});
+            }
+          },
+        );
+      },
     );
   }
 }

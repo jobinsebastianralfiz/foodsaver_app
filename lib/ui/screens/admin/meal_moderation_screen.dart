@@ -112,6 +112,7 @@ class _MealsList extends StatelessWidget {
         }
 
         if (snapshot.hasError) {
+          debugPrint('🔥 Firestore Error: ${snapshot.error}');
           return Center(child: Text('Error: ${snapshot.error}'));
         }
 

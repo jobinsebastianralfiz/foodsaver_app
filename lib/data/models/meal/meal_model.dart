@@ -35,6 +35,9 @@ class MealModel {
   final bool isVegetarian;
   final bool isVegan;
   final bool isGlutenFree;
+  final double? latitude;
+  final double? longitude;
+  final String? city;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -57,6 +60,9 @@ class MealModel {
     this.isVegetarian = false,
     this.isVegan = false,
     this.isGlutenFree = false,
+    this.latitude,
+    this.longitude,
+    this.city,
     required this.createdAt,
     this.updatedAt,
   });
@@ -102,6 +108,9 @@ class MealModel {
       isVegetarian: data['isVegetarian'] ?? false,
       isVegan: data['isVegan'] ?? false,
       isGlutenFree: data['isGlutenFree'] ?? false,
+      latitude: (data['latitude'] as num?)?.toDouble(),
+      longitude: (data['longitude'] as num?)?.toDouble(),
+      city: data['city'],
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       updatedAt: data['updatedAt'] != null
           ? (data['updatedAt'] as Timestamp).toDate()
@@ -129,6 +138,9 @@ class MealModel {
       'isVegetarian': isVegetarian,
       'isVegan': isVegan,
       'isGlutenFree': isGlutenFree,
+      'latitude': latitude,
+      'longitude': longitude,
+      'city': city,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
     };
@@ -161,6 +173,9 @@ class MealModel {
       isVegetarian: json['isVegetarian'] ?? false,
       isVegan: json['isVegan'] ?? false,
       isGlutenFree: json['isGlutenFree'] ?? false,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      city: json['city'],
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt:
           json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
@@ -188,6 +203,9 @@ class MealModel {
       'isVegetarian': isVegetarian,
       'isVegan': isVegan,
       'isGlutenFree': isGlutenFree,
+      'latitude': latitude,
+      'longitude': longitude,
+      'city': city,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
@@ -212,6 +230,9 @@ class MealModel {
     bool? isVegetarian,
     bool? isVegan,
     bool? isGlutenFree,
+    double? latitude,
+    double? longitude,
+    String? city,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -234,6 +255,9 @@ class MealModel {
       isVegetarian: isVegetarian ?? this.isVegetarian,
       isVegan: isVegan ?? this.isVegan,
       isGlutenFree: isGlutenFree ?? this.isGlutenFree,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      city: city ?? this.city,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

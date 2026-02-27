@@ -7,6 +7,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../providers/auth/auth_provider.dart';
 import '../../../data/services/storage/image_service.dart';
+import '../../../data/services/location/location_service.dart';
 import '../../shared/widgets/image_picker_widget.dart';
 
 class RestaurantProfileScreen extends StatefulWidget {
@@ -26,8 +27,13 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
   bool _isUploadingImage = false;
 
   final ImageService _imageService = ImageService();
+  final LocationService _locationService = LocationService();
   File? _selectedImage;
   String? _currentImageUrl;
+  bool _isFetchingLocation = false;
+  double? _latitude;
+  double? _longitude;
+  String? _city;
 
   @override
   void initState() {
@@ -52,6 +58,9 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
         setState(() {
           _addressController.text = data?['address'] ?? '';
           _descriptionController.text = data?['description'] ?? '';
+          _latitude = (data?['latitude'] as num?)?.toDouble();
+          _longitude = (data?['longitude'] as num?)?.toDouble();
+          _city = data?['city'];
         });
       }
     } catch (e) {
@@ -87,6 +96,30 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
       _selectedImage = null;
       _currentImageUrl = null;
     });
+  }
+
+  Future<void> _fetchLocation() async {
+    setState(() => _isFetchingLocation = true);
+    try {
+      final result = await _locationService.getCurrentLocation();
+      if (!mounted) return;
+      setState(() {
+        _latitude = result.latitude;
+        _longitude = result.longitude;
+        _city = result.city;
+        _addressController.text = result.address;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isFetchingLocation = false);
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -130,6 +163,9 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
         'address': _addressController.text.trim(),
         'description': _descriptionController.text.trim(),
         'profilePhoto': imageUrl,
+        'latitude': _latitude,
+        'longitude': _longitude,
+        'city': _city,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -266,23 +302,58 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
 
               const SizedBox(height: 20),
 
-              // Address Field
+              // Address Field with Location Fetch
               FadeInUp(
                 delay: const Duration(milliseconds: 400),
-                child: TextFormField(
-                  controller: _addressController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Address',
-                    prefixIcon: Icon(Icons.location_on),
-                    helperText: 'Pickup location for orders',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter address';
-                    }
-                    return null;
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: _addressController,
+                      maxLines: 2,
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Address',
+                        prefixIcon: const Icon(Icons.location_on),
+                        helperText: _city != null && _city!.isNotEmpty
+                            ? 'City: $_city'
+                            : 'Tap button below to fetch location',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please fetch your location';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _isFetchingLocation ? null : _fetchLocation,
+                        icon: _isFetchingLocation
+                            ? const SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.my_location),
+                        label: Text(
+                          _isFetchingLocation
+                              ? 'Fetching location...'
+                              : _latitude != null
+                                  ? 'Re-fetch Location'
+                                  : 'Fetch Current Location',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.all(14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 

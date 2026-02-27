@@ -16,6 +16,10 @@ class UserModel {
   final bool isApproved; // For restaurant approval
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final double? latitude;
+  final double? longitude;
+  final String? city;
+  final String? address;
 
   UserModel({
     required this.id,
@@ -27,6 +31,10 @@ class UserModel {
     this.isApproved = true, // Customers are auto-approved, restaurants need approval
     required this.createdAt,
     this.updatedAt,
+    this.latitude,
+    this.longitude,
+    this.city,
+    this.address,
   });
 
   // Convert from Firestore
@@ -45,6 +53,10 @@ class UserModel {
       isApproved: data['isApproved'] ?? true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      latitude: (data['latitude'] as num?)?.toDouble(),
+      longitude: (data['longitude'] as num?)?.toDouble(),
+      city: data['city'],
+      address: data['address'],
     );
   }
 
@@ -59,6 +71,10 @@ class UserModel {
       'isApproved': isApproved,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
+      'latitude': latitude,
+      'longitude': longitude,
+      'city': city,
+      'address': address,
     };
   }
 
@@ -81,6 +97,10 @@ class UserModel {
       updatedAt: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'])
           : null,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      city: json['city'],
+      address: json['address'],
     );
   }
 
@@ -96,6 +116,10 @@ class UserModel {
       'isApproved': isApproved,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'latitude': latitude,
+      'longitude': longitude,
+      'city': city,
+      'address': address,
     };
   }
 
@@ -109,6 +133,10 @@ class UserModel {
     bool? isApproved,
     DateTime? createdAt,
     DateTime? updatedAt,
+    double? latitude,
+    double? longitude,
+    String? city,
+    String? address,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -120,6 +148,10 @@ class UserModel {
       isApproved: isApproved ?? this.isApproved,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      city: city ?? this.city,
+      address: address ?? this.address,
     );
   }
 }

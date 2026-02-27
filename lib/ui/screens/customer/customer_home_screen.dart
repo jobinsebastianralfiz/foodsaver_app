@@ -11,14 +11,171 @@ import '../../../providers/review/review_provider.dart';
 import '../../../data/models/meal/meal_model.dart';
 import '../../../data/models/order/order_model.dart';
 import '../../../data/models/review/review_model.dart';
+import '../../../data/services/location/location_service.dart';
 import 'browse_meals_screen.dart';
 import 'my_orders_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
 import 'favorites_screen.dart';
 
-class CustomerHomeScreen extends StatelessWidget {
+class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
+
+  @override
+  State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
+}
+
+class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
+  final LocationService _locationService = LocationService();
+  String _selectedCity = '';
+  double? _userLat;
+  double? _userLng;
+  bool _isLoadingLocation = true;
+
+  static const List<String> _majorCities = [
+    'Thiruvananthapuram',
+    'Kochi',
+    'Kozhikode',
+    'Thrissur',
+    'Kollam',
+    'Palakkad',
+    'Alappuzha',
+    'Kannur',
+    'Kottayam',
+    'Malappuram',
+    'Kasaragod',
+    'Pathanamthitta',
+    'Idukki',
+    'Wayanad',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCurrentLocation();
+  }
+
+  Future<void> _fetchCurrentLocation() async {
+    try {
+      final result = await _locationService.getCurrentLocation();
+      if (!mounted) return;
+      setState(() {
+        _userLat = result.latitude;
+        _userLng = result.longitude;
+        _selectedCity = result.city;
+        _isLoadingLocation = false;
+      });
+    } catch (e) {
+      debugPrint('Location fetch error: $e');
+      if (!mounted) return;
+      setState(() => _isLoadingLocation = false);
+    }
+  }
+
+  void _showCityPicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Text(
+                  'Select City',
+                  style: AppTextStyles.heading3.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.my_location, color: AppColors.primary),
+                title: const Text('Current Location'),
+                subtitle: _userLat != null
+                    ? Text(_selectedCity.isNotEmpty ? _selectedCity : 'Detected location')
+                    : null,
+                onTap: () {
+                  Navigator.pop(context);
+                  _fetchCurrentLocation();
+                },
+              ),
+              const Divider(),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _majorCities.length,
+                  itemBuilder: (context, index) {
+                    final city = _majorCities[index];
+                    final isSelected = _selectedCity == city;
+                    return ListTile(
+                      leading: Icon(
+                        Icons.location_city,
+                        color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                      ),
+                      title: Text(
+                        city,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                        ),
+                      ),
+                      trailing: isSelected
+                          ? const Icon(Icons.check_circle, color: AppColors.primary)
+                          : null,
+                      onTap: () {
+                        setState(() => _selectedCity = city);
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Sort meals by distance from user location (nearest first).
+  List<MealModel> _sortByDistance(List<MealModel> meals) {
+    if (_userLat == null || _userLng == null) return meals;
+    final sorted = List<MealModel>.from(meals);
+    sorted.sort((a, b) {
+      final distA = (a.latitude != null && a.longitude != null)
+          ? LocationService.calculateDistance(_userLat!, _userLng!, a.latitude!, a.longitude!)
+          : double.infinity;
+      final distB = (b.latitude != null && b.longitude != null)
+          ? LocationService.calculateDistance(_userLat!, _userLng!, b.latitude!, b.longitude!)
+          : double.infinity;
+      return distA.compareTo(distB);
+    });
+    return sorted;
+  }
+
+  String _getDistanceText(MealModel meal) {
+    if (_userLat == null || _userLng == null || meal.latitude == null || meal.longitude == null) {
+      return '';
+    }
+    final dist = LocationService.calculateDistance(
+      _userLat!, _userLng!, meal.latitude!, meal.longitude!,
+    );
+    if (dist < 1) {
+      return '${(dist * 1000).toStringAsFixed(0)} m away';
+    }
+    return '${dist.toStringAsFixed(1)} km away';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,11 +194,27 @@ class CustomerHomeScreen extends StatelessWidget {
             backgroundColor: AppColors.primary,
             flexibleSpace: FlexibleSpaceBar(
               title: FadeIn(
-                child: Text(
-                  'FoodSaver',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                child: GestureDetector(
+                  onTap: _showCityPicker,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.location_on, color: Colors.white, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        _isLoadingLocation
+                            ? 'Detecting...'
+                            : _selectedCity.isNotEmpty
+                                ? _selectedCity
+                                : 'Select City',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Icon(Icons.arrow_drop_down, color: Colors.white, size: 20),
+                    ],
                   ),
                 ),
               ),
@@ -124,7 +297,11 @@ class CustomerHomeScreen extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const BrowseMealsScreen(),
+                            builder: (context) => BrowseMealsScreen(
+                              selectedCity: _selectedCity,
+                              userLat: _userLat,
+                              userLng: _userLng,
+                            ),
                           ),
                         );
                       },
@@ -182,30 +359,45 @@ class CustomerHomeScreen extends StatelessWidget {
                             title: 'All Meals',
                             color: AppColors.primary,
                             category: null,
+                            selectedCity: _selectedCity,
+                            userLat: _userLat,
+                            userLng: _userLng,
                           ),
                           _CategoryCard(
                             icon: Icons.breakfast_dining,
                             title: 'Breakfast',
                             color: AppColors.secondary,
                             category: MealCategory.breakfast,
+                            selectedCity: _selectedCity,
+                            userLat: _userLat,
+                            userLng: _userLng,
                           ),
                           _CategoryCard(
                             icon: Icons.lunch_dining,
                             title: 'Lunch',
                             color: AppColors.accent,
                             category: MealCategory.lunch,
+                            selectedCity: _selectedCity,
+                            userLat: _userLat,
+                            userLng: _userLng,
                           ),
                           _CategoryCard(
                             icon: Icons.dinner_dining,
                             title: 'Dinner',
                             color: AppColors.success,
                             category: MealCategory.dinner,
+                            selectedCity: _selectedCity,
+                            userLat: _userLat,
+                            userLng: _userLng,
                           ),
                           _CategoryCard(
                             icon: Icons.cake,
                             title: 'Desserts',
                             color: AppColors.warning,
                             category: MealCategory.dessert,
+                            selectedCity: _selectedCity,
+                            userLat: _userLat,
+                            userLng: _userLng,
                           ),
                         ],
                       ),
@@ -234,7 +426,11 @@ class CustomerHomeScreen extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const BrowseMealsScreen(),
+                                builder: (context) => BrowseMealsScreen(
+                                  selectedCity: _selectedCity,
+                                  userLat: _userLat,
+                                  userLng: _userLng,
+                                ),
                               ),
                             );
                           },
@@ -246,11 +442,13 @@ class CustomerHomeScreen extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // Available Meals List
+                  // Available Meals List (filtered by city)
                   FadeInUp(
                     delay: const Duration(milliseconds: 500),
                     child: StreamBuilder<List<MealModel>>(
-                      stream: context.read<MealProvider>().getAvailableMeals(),
+                      stream: _selectedCity.isNotEmpty
+                          ? context.read<MealProvider>().getAvailableMealsByCity(_selectedCity)
+                          : context.read<MealProvider>().getAvailableMeals(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting) {
                           return const Center(
@@ -285,7 +483,7 @@ class CustomerHomeScreen extends StatelessWidget {
                           );
                         }
 
-                        final meals = snapshot.data ?? [];
+                        final meals = _sortByDistance(snapshot.data ?? []);
 
                         if (meals.isEmpty) {
                           return Container(
@@ -304,7 +502,9 @@ class CustomerHomeScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'No meals available yet',
+                                  _selectedCity.isNotEmpty
+                                      ? 'No meals available in $_selectedCity'
+                                      : 'No meals available yet',
                                   style: AppTextStyles.subtitle1.copyWith(
                                     color: AppColors.textSecondary,
                                   ),
@@ -330,7 +530,13 @@ class CustomerHomeScreen extends StatelessWidget {
                           separatorBuilder: (_, __) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final meal = displayMeals[index];
-                            return _MealListCard(meal: meal);
+                            return _MealListCard(
+                              meal: meal,
+                              distanceText: _getDistanceText(meal),
+                              selectedCity: _selectedCity,
+                              userLat: _userLat,
+                              userLng: _userLng,
+                            );
                           },
                         );
                       },
@@ -348,9 +554,9 @@ class CustomerHomeScreen extends StatelessWidget {
                         final orders = snapshot.data ?? [];
                         final completedOrders = orders.where((o) => o.status == OrderStatus.completed).toList();
 
-                        final mealsSaved = completedOrders.length;
-                        final foodSaved = completedOrders.fold<double>(0, (sum, order) => sum + (order.quantity * 0.5)); // Estimate 0.5kg per meal
-                        final moneySaved = completedOrders.fold<double>(0, (sum, order) => sum + (order.totalPrice * 0.5)); // Estimate 50% savings
+                        final mealsSaved = completedOrders.fold<int>(0, (sum, order) => sum + order.quantity);
+                        final foodSaved = mealsSaved * 0.5; // Estimate 0.5kg per meal
+                        final moneySaved = completedOrders.fold<double>(0, (sum, order) => sum + order.totalPrice);
 
                         return Container(
                           padding: const EdgeInsets.all(24),
@@ -494,7 +700,13 @@ class CustomerHomeScreen extends StatelessWidget {
               // Browse
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const BrowseMealsScreen()),
+                MaterialPageRoute(
+                  builder: (context) => BrowseMealsScreen(
+                    selectedCity: _selectedCity,
+                    userLat: _userLat,
+                    userLng: _userLng,
+                  ),
+                ),
               );
               break;
             case 2:
@@ -551,12 +763,18 @@ class _CategoryCard extends StatelessWidget {
   final String title;
   final Color color;
   final MealCategory? category;
+  final String selectedCity;
+  final double? userLat;
+  final double? userLng;
 
   const _CategoryCard({
     required this.icon,
     required this.title,
     required this.color,
     this.category,
+    required this.selectedCity,
+    this.userLat,
+    this.userLng,
   });
 
   @override
@@ -566,7 +784,11 @@ class _CategoryCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => const BrowseMealsScreen(),
+            builder: (context) => BrowseMealsScreen(
+              selectedCity: selectedCity,
+              userLat: userLat,
+              userLng: userLng,
+            ),
           ),
         );
       },
@@ -733,8 +955,18 @@ class _ReviewCard extends StatelessWidget {
 
 class _MealListCard extends StatelessWidget {
   final MealModel meal;
+  final String distanceText;
+  final String selectedCity;
+  final double? userLat;
+  final double? userLng;
 
-  const _MealListCard({required this.meal});
+  const _MealListCard({
+    required this.meal,
+    required this.distanceText,
+    required this.selectedCity,
+    this.userLat,
+    this.userLng,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -743,7 +975,11 @@ class _MealListCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => const BrowseMealsScreen(),
+            builder: (context) => BrowseMealsScreen(
+              selectedCity: selectedCity,
+              userLat: userLat,
+              userLng: userLng,
+            ),
           ),
         );
       },
@@ -809,6 +1045,22 @@ class _MealListCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (distanceText.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, size: 12, color: AppColors.primary),
+                          const SizedBox(width: 2),
+                          Text(
+                            distanceText,
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.primary,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       children: [

@@ -66,6 +66,10 @@ class AuthRepository {
     required String name,
     required UserRole role,
     String? phoneNumber,
+    double? latitude,
+    double? longitude,
+    String? city,
+    String? address,
   }) async {
     try {
       // Create Firebase Auth user
@@ -91,6 +95,10 @@ class AuthRepository {
         role: role,
         isApproved: role == UserRole.customer, // true for customers, false for restaurants
         createdAt: DateTime.now(),
+        latitude: latitude,
+        longitude: longitude,
+        city: city,
+        address: address,
       );
 
       await _firestore

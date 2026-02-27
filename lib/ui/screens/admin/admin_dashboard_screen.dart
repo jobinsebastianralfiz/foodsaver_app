@@ -9,7 +9,6 @@ import 'pending_approvals_screen.dart';
 import 'user_management_screen.dart';
 import 'restaurant_management_screen.dart';
 import 'admin_analytics_screen.dart';
-import 'meal_moderation_screen.dart';
 import 'send_notification_screen.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
@@ -111,12 +110,6 @@ class AdminDashboardScreen extends StatelessWidget {
                 icon: const Icon(Icons.notifications_outlined, color: Colors.white),
                 onPressed: () {
                   // TODO: Navigate to notifications
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined, color: Colors.white),
-                onPressed: () {
-                  // TODO: Navigate to settings
                 },
               ),
             ],
@@ -317,26 +310,6 @@ class AdminDashboardScreen extends StatelessWidget {
 
                   FadeInUp(
                     delay: const Duration(milliseconds: 700),
-                    child: _AdminActionCard(
-                      icon: Icons.restaurant_menu,
-                      title: 'Meal Moderation',
-                      subtitle: 'Review and moderate meal listings',
-                      color: AppColors.info,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const MealModerationScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  FadeInUp(
-                    delay: const Duration(milliseconds: 800),
                     child: _AdminActionCard(
                       icon: Icons.notifications_active,
                       title: 'Send Notification',

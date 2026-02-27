@@ -58,6 +58,11 @@ class MealProvider extends ChangeNotifier {
     return _mealRepository.getMealsByCategory(category);
   }
 
+  // Get available meals filtered by city
+  Stream<List<MealModel>> getAvailableMealsByCity(String city) {
+    return _mealRepository.getAvailableMealsByCity(city);
+  }
+
   // Update meal
   Future<void> updateMeal(String mealId, Map<String, dynamic> updates) async {
     _isLoading = true;
