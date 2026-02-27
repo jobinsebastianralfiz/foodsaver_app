@@ -148,17 +148,24 @@ class OrderRepository {
     String reason,
   ) async {
     try {
-      await _firestore.collection('orders').doc(orderId).update({
+      // Use a batch to ensure both writes succeed or fail together
+      final batch = _firestore.batch();
+
+      final orderRef = _firestore.collection('orders').doc(orderId);
+      batch.update(orderRef, {
         'status': 'cancelled',
         'cancellationReason': reason,
         'updatedAt': Timestamp.now(),
       });
 
-      // Restore meal quantity
-      await _firestore.collection('meals').doc(mealId).update({
+      final mealRef = _firestore.collection('meals').doc(mealId);
+      batch.update(mealRef, {
         'availableQuantity': FieldValue.increment(quantity),
+        'status': 'available',
         'updatedAt': Timestamp.now(),
       });
+
+      await batch.commit();
     } catch (e) {
       throw Exception('Failed to cancel order: $e');
     }
