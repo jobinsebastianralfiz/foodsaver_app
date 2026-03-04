@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user/user_model.dart';
@@ -147,10 +148,14 @@ class AuthRepository {
   // Reset password
   Future<void> resetPassword(String email) async {
     try {
+      debugPrint('=== RESET PASSWORD: Sending to $email ===');
       await _firebaseAuth.sendPasswordResetEmail(email: email);
+      debugPrint('=== RESET PASSWORD: Success — email sent to $email ===');
     } on FirebaseAuthException catch (e) {
+      debugPrint('=== RESET PASSWORD ERROR (FirebaseAuth): ${e.code} - ${e.message} ===');
       throw _handleAuthException(e);
     } catch (e) {
+      debugPrint('=== RESET PASSWORD ERROR: $e ===');
       throw Exception('Password reset failed: $e');
     }
   }
