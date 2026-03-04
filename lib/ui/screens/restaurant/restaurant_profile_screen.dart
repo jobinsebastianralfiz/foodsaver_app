@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -286,6 +287,10 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
                 child: TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'Phone Number',
                     prefixIcon: Icon(Icons.phone),
@@ -294,6 +299,11 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter phone number';
+                    }
+                    final cleaned = value.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+                    final phoneRegex = RegExp(r'^(\+91)?[6-9]\d{9}$');
+                    if (!phoneRegex.hasMatch(cleaned)) {
+                      return 'Enter a valid 10-digit phone number';
                     }
                     return null;
                   },

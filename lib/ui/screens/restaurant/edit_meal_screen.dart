@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
@@ -171,6 +172,10 @@ class _EditMealScreenState extends State<EditMealScreen> {
     final soldQuantity = widget.meal.quantity - widget.meal.availableQuantity;
     final newAvailableQuantity = newQuantity - soldQuantity;
 
+    // Determine new status based on available quantity
+    final clampedAvailable = newAvailableQuantity.clamp(0, newQuantity);
+    final newStatus = clampedAvailable > 0 ? 'available' : 'soldOut';
+
     final updates = {
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim(),
@@ -179,14 +184,14 @@ class _EditMealScreenState extends State<EditMealScreen> {
       'originalPrice': double.parse(_originalPriceController.text),
       'discountedPrice': double.parse(_discountedPriceController.text),
       'quantity': newQuantity,
-      'availableQuantity': newAvailableQuantity.clamp(0, newQuantity),
-      'pickupStartTime': _pickupStartTime,
-      'pickupEndTime': _pickupEndTime,
+      'availableQuantity': clampedAvailable,
+      'status': newStatus,
+      'pickupStartTime': Timestamp.fromDate(_pickupStartTime),
+      'pickupEndTime': Timestamp.fromDate(_pickupEndTime),
       'isVegetarian': _isVegetarian,
       'isVegan': _isVegan,
       'isGlutenFree': _isGlutenFree,
       'allergens': _allergens,
-      'updatedAt': DateTime.now(),
     };
 
     try {

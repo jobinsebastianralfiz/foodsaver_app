@@ -71,11 +71,9 @@ service cloud.firestore {
       // Admins can update/delete any meal
       allow update, delete: if isAdmin();
 
-      // Allow authenticated users to update availableQuantity (for orders)
-      // But only if they're decreasing it
+      // Allow authenticated users to update availableQuantity (for orders and cancellations)
       allow update: if isAuthenticated() &&
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availableQuantity', 'updatedAt']) &&
-                      request.resource.data.availableQuantity < resource.data.availableQuantity;
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availableQuantity', 'updatedAt', 'status']);
     }
 
     // Orders collection

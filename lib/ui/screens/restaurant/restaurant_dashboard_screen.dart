@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
+import '../../../data/models/order/order_model.dart';
 import '../../../data/models/review/review_model.dart';
+import '../../../data/repositories/order_repository.dart';
 import '../../../data/repositories/review_repository.dart';
 import '../../../providers/auth/auth_provider.dart';
 import '../admin/send_notification_screen.dart';
@@ -13,8 +17,86 @@ import 'my_meals_screen.dart';
 import 'restaurant_analytics_screen.dart';
 import 'restaurant_profile_screen.dart';
 
-class RestaurantDashboardScreen extends StatelessWidget {
+class RestaurantDashboardScreen extends StatefulWidget {
   const RestaurantDashboardScreen({super.key});
+
+  @override
+  State<RestaurantDashboardScreen> createState() => _RestaurantDashboardScreenState();
+}
+
+class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen> {
+  final OrderRepository _orderRepository = OrderRepository();
+
+  int _activeMeals = 0;
+  int _ordersToday = 0;
+  double _revenue = 0;
+  double _foodSaved = 0;
+  bool _statsLoaded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_statsLoaded) {
+      _loadStats();
+      _statsLoaded = true;
+    }
+  }
+
+  Future<void> _loadStats() async {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.user;
+    if (user == null) return;
+
+    debugPrint('=== DASHBOARD STATS: Loading for restaurant ${user.id} ===');
+
+    // Load active meals
+    try {
+      final mealsSnapshot = await FirebaseFirestore.instance
+          .collection('meals')
+          .where('restaurantId', isEqualTo: user.id)
+          .where('status', isEqualTo: 'available')
+          .get();
+      final activeMeals = mealsSnapshot.docs.length;
+      debugPrint('DASHBOARD STATS: Active Meals = $activeMeals');
+      if (mounted) setState(() => _activeMeals = activeMeals);
+    } catch (e) {
+      debugPrint('DASHBOARD STATS ERROR (meals): $e');
+    }
+
+    // Load order stats
+    try {
+      final stats = await _orderRepository.getRestaurantStatistics(user.id);
+      debugPrint('DASHBOARD STATS: Orders Today = ${stats['todayOrders']}');
+      debugPrint('DASHBOARD STATS: Revenue = ${stats['totalRevenue']}');
+      debugPrint('DASHBOARD STATS: Completed Orders = ${stats['completedOrders']}');
+
+      // Calculate food saved from completed orders
+      final allOrdersSnapshot = await FirebaseFirestore.instance
+          .collection('orders')
+          .where('restaurantId', isEqualTo: user.id)
+          .get();
+      double foodSaved = 0;
+      for (var doc in allOrdersSnapshot.docs) {
+        final order = OrderModel.fromFirestore(doc);
+        if (order.status == OrderStatus.completed) {
+          foodSaved += order.quantity * 0.5; // approx 0.5 kg per item
+        }
+      }
+      debugPrint('DASHBOARD STATS: Food Saved = ${foodSaved} kg');
+
+      if (mounted) {
+        setState(() {
+          _ordersToday = stats['todayOrders'] as int;
+          _revenue = (stats['totalRevenue'] as num).toDouble();
+          _foodSaved = foodSaved;
+        });
+      }
+    } catch (e) {
+      debugPrint('DASHBOARD STATS ERROR (orders): $e');
+    }
+
+    debugPrint('=== DASHBOARD STATS: Done ===');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +225,7 @@ class RestaurantDashboardScreen extends StatelessWidget {
                           child: _StatCard(
                             icon: Icons.restaurant_menu,
                             title: 'Active Meals',
-                            value: '0',
+                            value: '$_activeMeals',
                             color: AppColors.primary,
                           ),
                         ),
@@ -152,7 +234,7 @@ class RestaurantDashboardScreen extends StatelessWidget {
                           child: _StatCard(
                             icon: Icons.shopping_cart,
                             title: 'Orders Today',
-                            value: '0',
+                            value: '$_ordersToday',
                             color: AppColors.secondary,
                           ),
                         ),
@@ -170,7 +252,7 @@ class RestaurantDashboardScreen extends StatelessWidget {
                           child: _StatCard(
                             icon: Icons.attach_money,
                             title: 'Revenue',
-                            value: '₹0',
+                            value: '₹${_revenue.toStringAsFixed(0)}',
                             color: AppColors.success,
                           ),
                         ),
@@ -179,7 +261,7 @@ class RestaurantDashboardScreen extends StatelessWidget {
                           child: _StatCard(
                             icon: Icons.eco,
                             title: 'Food Saved',
-                            value: '0 kg',
+                            value: '${_foodSaved.toStringAsFixed(1)} kg',
                             color: AppColors.accent,
                           ),
                         ),

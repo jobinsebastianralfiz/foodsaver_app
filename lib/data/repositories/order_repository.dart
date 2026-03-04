@@ -36,10 +36,18 @@ class OrderRepository {
           await _firestore.collection('orders').add(order.toFirestore());
 
       // Decrease meal available quantity
-      await _firestore.collection('meals').doc(order.mealId).update({
+      final mealRef = _firestore.collection('meals').doc(order.mealId);
+      await mealRef.update({
         'availableQuantity': FieldValue.increment(-order.quantity),
         'updatedAt': Timestamp.now(),
       });
+
+      // Check if meal is now sold out
+      final mealSnap = await mealRef.get();
+      final availableQty = (mealSnap.data()?['availableQuantity'] ?? 0) as int;
+      if (availableQty <= 0) {
+        await mealRef.update({'status': 'soldOut'});
+      }
 
       return docRef.id;
     } catch (e) {
@@ -147,26 +155,59 @@ class OrderRepository {
     int quantity,
     String reason,
   ) async {
-    try {
-      // Use a batch to ensure both writes succeed or fail together
-      final batch = _firestore.batch();
+    debugPrint('=== CANCEL ORDER START ===');
+    debugPrint('orderId: $orderId');
+    debugPrint('mealId: $mealId');
+    debugPrint('quantity to restore: $quantity');
+    debugPrint('reason: $reason');
 
-      final orderRef = _firestore.collection('orders').doc(orderId);
-      batch.update(orderRef, {
+    try {
+      final mealRef = _firestore.collection('meals').doc(mealId);
+
+      // Read meal BEFORE cancelling to get current stock
+      final mealSnapBefore = await mealRef.get();
+      if (mealSnapBefore.exists) {
+        final beforeQty = mealSnapBefore.data()?['availableQuantity'];
+        final beforeStatus = mealSnapBefore.data()?['status'];
+        debugPrint('BEFORE cancel - availableQuantity: $beforeQty, status: $beforeStatus');
+      } else {
+        debugPrint('WARNING: Meal doc $mealId does NOT exist!');
+      }
+
+      // Update order status
+      await _firestore.collection('orders').doc(orderId).update({
         'status': 'cancelled',
         'cancellationReason': reason,
         'updatedAt': Timestamp.now(),
       });
+      debugPrint('Order status updated to cancelled');
 
-      final mealRef = _firestore.collection('meals').doc(mealId);
-      batch.update(mealRef, {
-        'availableQuantity': FieldValue.increment(quantity),
-        'status': 'available',
-        'updatedAt': Timestamp.now(),
-      });
+      // Restore meal stock
+      if (mealSnapBefore.exists) {
+        final currentStatus = mealSnapBefore.data()?['status'] ?? 'available';
+        final updates = <String, dynamic>{
+          'availableQuantity': FieldValue.increment(quantity),
+          'updatedAt': Timestamp.now(),
+        };
 
-      await batch.commit();
+        // Restore status to available if it was soldOut
+        if (currentStatus == 'soldOut') {
+          updates['status'] = 'available';
+        }
+
+        await mealRef.update(updates);
+        debugPrint('Meal stock updated with: $updates');
+
+        // Read meal AFTER to verify
+        final mealSnapAfter = await mealRef.get();
+        final afterQty = mealSnapAfter.data()?['availableQuantity'];
+        final afterStatus = mealSnapAfter.data()?['status'];
+        debugPrint('AFTER cancel - availableQuantity: $afterQty, status: $afterStatus');
+      }
+
+      debugPrint('=== CANCEL ORDER DONE ===');
     } catch (e) {
+      debugPrint('=== CANCEL ORDER ERROR: $e ===');
       throw Exception('Failed to cancel order: $e');
     }
   }

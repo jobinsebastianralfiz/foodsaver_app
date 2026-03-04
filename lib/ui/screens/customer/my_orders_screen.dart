@@ -222,12 +222,31 @@ class _OrderCard extends StatelessWidget {
                       );
 
                       if (confirmed == true && context.mounted) {
-                        await orderProvider.cancelOrder(
-                          order.id,
-                          order.mealId,
-                          order.quantity,
-                          'Cancelled by customer',
-                        );
+                        try {
+                          await orderProvider.cancelOrder(
+                            order.id,
+                            order.mealId,
+                            order.quantity,
+                            'Cancelled by customer',
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Order cancelled, stock restored.'),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Cancel failed: $e'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        }
                       }
                     },
                     icon: const Icon(Icons.cancel),

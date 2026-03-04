@@ -338,6 +338,76 @@ class _OrderCardState extends State<_OrderCard> {
                           ),
                       ],
                     ),
+                  const SizedBox(height: 8),
+                  if (order.canBeCancelled)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _isUpdating
+                            ? null
+                            : () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Cancel Order?'),
+                                    content: const Text(
+                                      'This will cancel the order and restore the meal stock.',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, false),
+                                        child: const Text('No'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: AppColors.error,
+                                        ),
+                                        child: const Text('Yes, Cancel'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (confirmed == true && context.mounted) {
+                                  setState(() => _isUpdating = true);
+                                  try {
+                                    final orderProvider = context.read<OrderProvider>();
+                                    await orderProvider.cancelOrder(
+                                      order.id,
+                                      order.mealId,
+                                      order.quantity,
+                                      'Cancelled by restaurant',
+                                    );
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Order cancelled, stock restored.'),
+                                          backgroundColor: AppColors.success,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Failed to cancel: $e'),
+                                          backgroundColor: AppColors.error,
+                                        ),
+                                      );
+                                      setState(() => _isUpdating = false);
+                                    }
+                                  }
+                                }
+                              },
+                        icon: const Icon(Icons.cancel),
+                        label: const Text('Cancel Order'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                          side: const BorderSide(color: AppColors.error),
+                        ),
+                      ),
+                    ),
                 ],
               ],
             ),
