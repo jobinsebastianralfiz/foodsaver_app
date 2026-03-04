@@ -94,6 +94,9 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
                       (resource.data.userId == request.auth.uid ||
                        resource.data.restaurantId == request.auth.uid);
+
+      // Admins can update and delete any order
+      allow update, delete: if isAdmin();
     }
 
     // Reviews collection

@@ -221,7 +221,7 @@ class _RestaurantCard extends StatelessWidget {
         title: const Text('Delete Restaurant?'),
         content: Text(
           'Are you sure you want to delete "$restaurantName"?\n\n'
-          'This will also delete all meals added by this restaurant. This action cannot be undone.',
+          'This will delete all meals, orders, reviews, and notifications related to this restaurant. This action cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -241,27 +241,54 @@ class _RestaurantCard extends StatelessWidget {
       try {
         final firestore = FirebaseFirestore.instance;
 
-        // Delete all meals by this restaurant
+        // Fetch all related documents
         final mealsSnapshot = await firestore
             .collection('meals')
             .where('restaurantId', isEqualTo: restaurantId)
             .get();
 
-        final batch = firestore.batch();
-        for (final meal in mealsSnapshot.docs) {
-          batch.delete(meal.reference);
+        final ordersSnapshot = await firestore
+            .collection('orders')
+            .where('restaurantId', isEqualTo: restaurantId)
+            .get();
+
+        final reviewsSnapshot = await firestore
+            .collection('reviews')
+            .where('restaurantId', isEqualTo: restaurantId)
+            .get();
+
+        final notificationsSnapshot = await firestore
+            .collection('notifications')
+            .where('targetUserId', isEqualTo: restaurantId)
+            .get();
+
+        // Firestore batches have a 500 op limit, so chunk if needed
+        final allDocs = <DocumentReference>[
+          ...mealsSnapshot.docs.map((d) => d.reference),
+          ...ordersSnapshot.docs.map((d) => d.reference),
+          ...reviewsSnapshot.docs.map((d) => d.reference),
+          ...notificationsSnapshot.docs.map((d) => d.reference),
+          firestore.collection('users').doc(restaurantId),
+        ];
+
+        // Delete in batches of 400 to stay under limit
+        for (var i = 0; i < allDocs.length; i += 400) {
+          final batch = firestore.batch();
+          final chunk = allDocs.skip(i).take(400);
+          for (final ref in chunk) {
+            batch.delete(ref);
+          }
+          await batch.commit();
         }
-
-        // Delete the restaurant user document
-        batch.delete(firestore.collection('users').doc(restaurantId));
-
-        await batch.commit();
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '$restaurantName and ${mealsSnapshot.docs.length} meal(s) deleted successfully',
+                '$restaurantName deleted — '
+                '${mealsSnapshot.docs.length} meal(s), '
+                '${ordersSnapshot.docs.length} order(s), '
+                '${reviewsSnapshot.docs.length} review(s) removed',
               ),
               backgroundColor: AppColors.success,
             ),
